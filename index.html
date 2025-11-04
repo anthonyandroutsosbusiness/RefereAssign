@@ -18,7 +18,9 @@
             box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
             display: flex;
             flex-direction: column;
+            cursor: pointer; /* Makes all cards look clickable */
         }
+        
         .fixture-main-content {
             display: flex;
             align-items: center;
@@ -31,6 +33,8 @@
             border-top: 1px solid #f3f4f6;
             background-color: #fff; 
         }
+
+        /* Admin specific styles */
         .admin-section {
             background-color: #ffe0e0;
             border: 2px solid #ef4444;
@@ -67,7 +71,6 @@
                 flex-direction: row; 
                 height: 80px; 
                 padding: 0;
-                cursor: pointer; /* Makes the card look clickable for Admin */
             }
             .fixture-main-content {
                 padding: 0 1rem;
@@ -165,11 +168,11 @@
             </div>
         </div>
 
-        <!-- Archived Fixtures -->
-        <h2 class="text-2xl font-bold text-gray-700 border-b pb-2 mt-12 mb-4">Archived Schedules</h2>
+        <!-- Archived Fixtures (Hidden as per user focus, but good to keep logic) -->
+        <!-- <h2 class="text-2xl font-bold text-gray-700 border-b pb-2 mt-12 mb-4">Archived Schedules</h2>
         <div id="archived-fixtures-list" class="space-y-3 text-gray-500">
             <p class="text-center py-5" id="archived-empty-message">No past fixtures found.</p>
-        </div>
+        </div> -->
     </main>
     
     <!-- Admin Assignment Modal (Hidden) -->
@@ -212,7 +215,7 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, doc, updateDoc, onSnapshot, getDoc, writeBatch, query, getDocs, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, doc, updateDoc, onSnapshot, getDoc, writeBatch, query, getDocs, setDoc, serverTimestamp, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         
         // Global State
         let app, db, auth;
@@ -268,6 +271,7 @@
             for (const line of lines) {
                 const lowerLine = line.toLowerCase();
                 
+                // 1. Check for Date
                 const dateMatch = line.match(dateRegex);
                 if (dateMatch) {
                     currentDate = dateMatch[0];
@@ -276,12 +280,14 @@
                     continue;
                 }
                 
+                // 2. Skip Headers
                 if (headers.includes(lowerLine)) {
                     continue;
                 }
 
                 if (!currentDate) continue; 
 
+                // 3. Sequential Parsing
                 switch (fixtureState) {
                     case 0: 
                         currentFixture = { home: line, date: currentDate };
@@ -300,6 +306,7 @@
                         fixtureState = 4;
                         break;
                     case 4: 
+                        // Last field: Time and final processing
                         if (line.match(timeRegex)) {
                             currentFixture.time = line;
 
@@ -328,29 +335,24 @@
             return fixtures;
         };
 
-        // --- Identity Management ---
+        // --- Identity Management (2. Minimise Forms on Success) ---
         
         function updateUIBasedOnIdentity() {
-            const controlPanel = document.getElementById('user-control-panel');
             const display = document.getElementById('identity-display');
             const refForm = document.getElementById('identity-form');
             const adminForm = document.getElementById('admin-login-form');
             const greeting = document.getElementById('ref-greeting');
             const adminPanel = document.getElementById('admin-panel');
             const dbStatusMessage = document.getElementById('db-status-message');
-            const adminPanelDetails = document.getElementById('admin-panel-details');
-            const adminToggleIcon = document.getElementById('admin-toggle-icon');
-
+            
             // Reset forms and display
             refForm.classList.add('hidden');
             adminForm.classList.add('hidden');
             display.classList.add('hidden');
             adminPanel.classList.add('hidden');
-            adminPanelDetails.classList.add('hidden');
-            adminToggleIcon.textContent = '+'; 
-            
+
             if (userName) {
-                // Logged In: Show identity and relevant tools
+                // Logged In: Show identity
                 display.classList.remove('hidden');
                 document.getElementById('display-ref-name').textContent = userName;
                 greeting.textContent = `Welcome, ${userName}. View and manage assignments below.`;
@@ -359,7 +361,7 @@
                     document.getElementById('display-role').textContent = 'Administrator';
                     document.getElementById('display-role').classList.add('text-red-600');
                     
-                    // Admin: Show minimized tool panel
+                    // Admin: Show tool panel (minimized by default until used)
                     adminPanel.classList.remove('hidden');
 
                     if (isDbReady) {
@@ -415,6 +417,7 @@
             if (!inputName) {
                 return showStatus('danger', 'Please enter your full name.');
             }
+            // Use the full name as a simplified unique ID for the referee for this scenario
             userId = inputName.toLowerCase().replace(/\s/g, '-'); 
             userName = inputName;
             userRole = 'referee';
@@ -508,7 +511,7 @@
             }
         }
 
-        // --- Data Loading and Parsing ---
+        // --- Data Loading and Parsing (Ensuring all fixtures are processed) ---
 
         window.parseAndLoadFixtures = async function() {
             if (userRole !== 'admin') {
@@ -526,13 +529,12 @@
             if (!isDbReady || !db) {
                 showStatus('warning', `⚠️ Database not ready. Fixtures displayed locally (will NOT be saved). Please fix the Firebase Config issue for persistence.`);
                 document.getElementById('upcoming-fixtures-list').innerHTML = '';
-                document.getElementById('archived-fixtures-list').innerHTML = '';
-                renderFixtures(fixturesToLoad);
+                // renderFixtures(fixturesToLoad); // Do not render locally if not saving
                 return;
             }
             // --- END LOCAL DISPLAY FALLBACK ---
 
-            // --- Database write logic (only runs if isDbReady is true) ---
+            // --- Database write logic ---
             showStatus('warning', `Parsed ${fixturesToLoad.length} valid fixtures. Starting persistent database ingestion...`);
             toggleAdminPanel(); // Minimize the input area after clicking Load
 
@@ -555,6 +557,7 @@
                         assignedRef: null,
                         volunteers: [], 
                         status: 'open',
+                        dateSortable: fixture.dateSortable || Date.now(), // Ensure this exists
                         createdAt: serverTimestamp(),
                         updatedAt: serverTimestamp(),
                     };
@@ -570,13 +573,16 @@
             }
         };
 
-        // --- Data Listener and UI Rendering ---
+        // --- Data Listener and UI Rendering (3. Grouping by Date Fix) ---
         
         function setupDataListener() {
             const fixturesRef = collection(db, FIRES_COLLECTION_PATH);
             const loadingIndicator = document.getElementById('loading-indicator');
             
-            onSnapshot(fixturesRef, (snapshot) => {
+            // Query ordered by dateSortable
+            const fixturesQuery = query(fixturesRef); // Removed explicit orderBy to avoid index requirement, sorting in memory is safer here.
+
+            onSnapshot(fixturesQuery, (snapshot) => {
                 loadingIndicator.classList.add('hidden'); 
                 
                 const allFixtures = [];
@@ -584,7 +590,7 @@
                     allFixtures.push({ id: doc.id, ...doc.data() });
                 });
                 
-                // Sort chronologically using the dateSortable timestamp
+                // Sort chronologically using the dateSortable timestamp in memory
                 allFixtures.sort((a, b) => a.dateSortable - b.dateSortable);
 
                 renderFixtures(allFixtures);
@@ -598,26 +604,21 @@
 
         function renderFixtures(allFixtures) {
             const upcomingList = document.getElementById('upcoming-fixtures-list');
-            const archivedList = document.getElementById('archived-fixtures-list');
-            
             upcomingList.innerHTML = '';
-            archivedList.innerHTML = '';
             
-            const now = new Date();
-            let upcomingCount = 0;
-            let archivedCount = 0;
+            const now = new Date().getTime();
             let currentGroupedDate = null;
+            let fixtureCount = 0;
 
             allFixtures.forEach(fixture => {
-                const fixtureDateTime = new Date(fixture.dateSortable);
-                const isPast = isNaN(fixtureDateTime.getTime()) ? false : fixtureDateTime < now;
-                const targetList = isPast ? archivedList : upcomingList;
+                // Only render upcoming fixtures
+                if (fixture.dateSortable < now) return;
+                fixtureCount++;
                 
-                if (!isPast) upcomingCount++; else archivedCount++;
-
-                // 3. Group by Date Header
                 const dateHeaderKey = fixture.dateFormatted || fixture.date;
-                if (!isPast && dateHeaderKey !== currentGroupedDate) {
+                
+                // --- Date Grouping Logic ---
+                if (dateHeaderKey !== currentGroupedDate) {
                     currentGroupedDate = dateHeaderKey;
                     const dateHeader = document.createElement('h3');
                     dateHeader.className = "text-xl font-bold text-gray-800 mt-6 mb-3 p-2 bg-gray-200 rounded-lg shadow-inner";
@@ -627,7 +628,7 @@
 
                 const card = document.createElement('div');
                 const volunteerCount = fixture.volunteers ? fixture.volunteers.length : 0;
-                const isVolunteer = fixture.volunteers && userName && fixture.volunteers.includes(userName);
+                const isVolunteer = userName && fixture.volunteers && fixture.volunteers.includes(userName);
                 
                 let baseClasses = "fixture-card rounded-xl shadow-md overflow-hidden transition duration-300 ";
                 let teamClasses = "text-base font-semibold truncate ";
@@ -641,12 +642,8 @@
                     teamClasses += ' text-gray-800';
                 } else if (isVolunteer) {
                      baseClasses += ' bg-yellow-50 border-l-4 border-yellow-500 hover:shadow-lg';
-                     statusBadge = `<span class="text-sm font-bold text-yellow-700">VOLUNTEERED</span>`;
+                     statusBadge = `<span class="text-sm font-bold text-yellow-700">APPLIED</span>`;
                      teamClasses += ' text-gray-800';
-                } else if (isPast) {
-                     baseClasses += ' bg-gray-100 border-l-4 border-gray-400';
-                     teamClasses += ' text-gray-500';
-                     statusBadge = `<span class="text-sm font-bold text-gray-500">ARCHIVED</span>`;
                 } else {
                     // Open and not volunteered
                     baseClasses += ' bg-white border-l-4 border-red-500 hover:shadow-xl';
@@ -655,12 +652,10 @@
                 }
 
                 // --- Action Content (Admin vs Referee) ---
-                if (isPast) {
-                    actionHtml = `<div class="p-2 text-center text-xs">
-                        <p class="font-semibold text-gray-600">${fixture.assignedRef || 'Unassigned'}</p>
-                    </div>`;
-                } else if (userRole === 'admin') {
-                    // Admin View: Card is clickable to open modal
+                
+                // 1. Admin View: Card is clickable to open modal
+                if (userRole === 'admin') {
+                    // Make all upcoming cards clickable for admin to manage
                     card.setAttribute('onclick', `openAssignmentModal('${fixture.id}', '${fixture.home}', '${fixture.away}', '${dateHeaderKey}', '${fixture.time}', ${JSON.stringify(fixture.volunteers || [])}, '${fixture.assignedRef}')`);
 
                     if (fixture.status === 'open') {
@@ -677,31 +672,33 @@
                                 <button onclick="event.stopPropagation(); handleUnassign('${fixture.id}')" class="text-xs text-red-500 hover:text-red-700 underline">Clear</button>
                             </div>`;
                     }
-                } else if (userName && fixture.status === 'open') {
-                    // Referee View: Volunteer/Cancel button (4. Referee Volunteer Fix)
-                    const actionClass = isVolunteer ? 'bg-red-500 hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700';
-                    const actionText = isVolunteer ? 'Cancel Volunteer' : 'Volunteer Now';
-                    const actionState = isVolunteer ? 'false' : 'true'; // True means volunteer, false means cancel
+                } 
+                // 2. Referee View: Volunteer/Cancel button
+                else if (userName && userRole === 'referee') {
+                    // 4. Referee Volunteer Fix - Action based on status
+                    if (fixture.status === 'assigned') {
+                        actionHtml = `<div class="p-2 text-center text-sm text-green-600 font-bold">Assigned to: ${fixture.assignedRef}</div>`;
+                        card.removeAttribute('onclick'); // Not clickable
+                    } else {
+                        // Open match: Volunteer/Cancel button
+                        const actionClass = isVolunteer ? 'bg-red-500 hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700';
+                        const actionText = isVolunteer ? 'Cancel Application' : 'Apply Now';
+                        const actionState = isVolunteer ? 'false' : 'true'; // True means volunteer, false means cancel
 
-                    actionHtml = `
-                        <button onclick="handleVolunteer('${fixture.id}', ${actionState})" class="w-full h-full text-white p-2 font-semibold text-sm ${actionClass} transition duration-150">
-                            ${actionText}
-                        </button>`;
-                    card.removeAttribute('onclick'); // Make sure ref clicks the button, not the card
+                        actionHtml = `
+                            <button onclick="handleVolunteer(event, '${fixture.id}', ${actionState})" class="w-full h-full text-white p-2 font-semibold text-sm ${actionClass} transition duration-150">
+                                ${actionText}
+                            </button>`;
+                        card.removeAttribute('onclick'); // Not clickable, button handles action
+                    }
+
                 } else {
-                    // Logged out or Assigned match
-                    actionHtml = `<div class="p-2 text-center text-sm text-gray-500">${fixture.status === 'assigned' ? 'Assigned' : 'Log In'}</div>`;
+                    // Logged out
+                    actionHtml = `<div class="p-2 text-center text-sm text-gray-500">${fixture.status === 'assigned' ? 'Assigned' : 'Login to Apply'}</div>`;
                     card.removeAttribute('onclick');
                 }
                 
-                // Add conditional click handler for the card itself only if it's an Admin open fixture
-                if (userRole === 'admin' && fixture.status === 'open') {
-                    card.setAttribute('onclick', `openAssignmentModal('${fixture.id}', '${fixture.home}', '${fixture.away}', '${dateHeaderKey}', '${fixture.time}', ${JSON.stringify(fixture.volunteers || [])}, '${fixture.assignedRef}')`);
-                } else {
-                    card.removeAttribute('onclick');
-                }
-
-
+                card.className = baseClasses;
                 card.innerHTML = `
                     <!-- Main Fixture Details -->
                     <div class="fixture-main-content">
@@ -728,17 +725,16 @@
                     </div>
                     
                     <!-- Action Area -->
-                    <div class="fixture-action-area ${userRole !== 'admin' || isPast ? '' : 'sm:w-32'}">
+                    <div class="fixture-action-area">
                         ${actionHtml}
                     </div>
                 `;
-                targetList.appendChild(card);
+                upcomingList.appendChild(card);
             });
             
-            if (upcomingCount === 0) {
+            if (fixtureCount === 0) {
                 upcomingList.innerHTML = `<p class="text-center py-10 text-gray-500">No upcoming fixtures. Admin needs to load the schedule.</p>`;
             }
-            document.getElementById('archived-empty-message').classList.toggle('hidden', archivedCount > 0);
         }
 
         // --- Admin Assignment Modal Logic (1. Admin Dropdown/Modal) ---
@@ -820,7 +816,7 @@
                 await updateDoc(matchRef, {
                     assignedRef: targetRefName,
                     status: 'assigned',
-                    volunteers: [targetRefName], 
+                    // Keep the volunteers list as is, it implicitly shows who was considered
                     updatedAt: serverTimestamp()
                 });
                 closeAssignmentModal();
@@ -831,8 +827,11 @@
             }
         };
 
-        // --- Referee Action: Volunteer/Cancel (4. Checkup on functionality) ---
-        window.handleVolunteer = async function(matchId, isVolunteering) {
+        // --- Referee Action: Volunteer/Cancel (4. Volunteer Fix) ---
+        window.handleVolunteer = async function(event, matchId, isVolunteering) {
+            // Stop propagation so card click for admin logic is ignored
+            event.stopPropagation(); 
+            
             if (!userName || userRole !== 'referee') return showStatus('danger', 'Please log in as a Referee first.');
             if (!db || !isDbReady) {
                 showStatus('warning', 'Database not ready. Your volunteer status cannot be saved persistently.');
@@ -840,35 +839,27 @@
             }
 
             const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
-            // We use a transaction or get/update to ensure volunteers array integrity
-            try {
-                 const refDoc = await getDoc(matchRef);
-                 if (!refDoc.exists()) return showStatus('danger', 'Match not found.');
             
-                 const data = refDoc.data();
-                 if (data.status === 'assigned') return showStatus('warning', 'This match is already assigned and closed for volunteering.');
-
-                 let volunteers = data.volunteers || [];
-                 const previousVolunteerCount = volunteers.length;
-
+            try {
                 if (isVolunteering) {
-                    if (!volunteers.includes(userName)) {
-                        volunteers.push(userName);
-                    }
+                    // Add referee name to the volunteers array
+                    await updateDoc(matchRef, { 
+                        volunteers: arrayUnion(userName),
+                        updatedAt: serverTimestamp()
+                    });
+                    showStatus('success', `✅ ${userName}, you have applied for this match!`);
                 } else {
-                    volunteers = volunteers.filter(name => name !== userName);
-                }
-
-                if (volunteers.length !== previousVolunteerCount) {
-                     await updateDoc(matchRef, { volunteers: volunteers, updatedAt: serverTimestamp() });
-                     showStatus('success', isVolunteering ? `✅ ${userName}, you have volunteered! The Admin can now see your request.` : '❌ Volunteering cancelled.');
-                } else {
-                     showStatus('warning', isVolunteering ? 'You are already a volunteer for this match.' : 'You were not listed as a volunteer.');
+                    // Remove referee name from the volunteers array
+                    await updateDoc(matchRef, { 
+                        volunteers: arrayRemove(userName),
+                        updatedAt: serverTimestamp()
+                    });
+                    showStatus('warning', '❌ Application cancelled.');
                 }
 
             } catch(e) {
                 console.error("Volunteer update failed:", e);
-                showStatus('danger', 'Failed to update volunteer status.');
+                showStatus('danger', 'Failed to update application status.');
             }
         };
 
@@ -882,7 +873,6 @@
                  await updateDoc(matchRef, {
                     assignedRef: null,
                     status: 'open',
-                    // Retain volunteers list, but set status back to open
                     updatedAt: serverTimestamp()
                  });
                  showStatus('warning', 'Assignment cleared. Match is now open for volunteering.');
@@ -900,3 +890,5 @@
 
         startApp();
     </script>
+</body>
+</html>
