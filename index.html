@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Referee Scheduler</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc;
+        }
+        .container {
+            max-width: 1200px;
+        }
+        .card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            border-radius: 0.75rem;
+        }
+        .btn-primary {
+            transition: all 0.15s ease-in-out;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(109, 40, 217, 0.4);
+        }
+        .ref-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.1rem 0.5rem;
+            margin-right: 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            line-height: 1;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+
+    <div id="app" class="container mx-auto">
+        <header class="text-center mb-8 bg-white p-6 card">
+            <h1 class="text-4xl font-extrabold text-indigo-700">Weekly Fixture Management</h1>
+            <p id="user-info" class="text-sm text-gray-600 mt-2"></p>
+            <div class="mt-4 flex justify-center space-x-4">
+                <button id="toggle-view-btn" class="bg-purple-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-600 transition duration-150">
+                    Switch to Referee View
+                </button>
+            </div>
+        </header>
+
+        <!-- Loading Spinner -->
+        <div id="loading" class="text-center py-10 hidden">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto"></div>
+            <p class="mt-4 text-indigo-600">Loading data and authenticating...</p>
+        </div>
+
+        <!-- Administrator View (Default) -->
+        <div id="admin-view" class="space-y-8">
+             <section id="admin-login-section" class="bg-white p-6 card">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Admin Login Required</h2>
+                <div class="flex flex-col space-y-4 max-w-sm mx-auto">
+                    <div>
+                        <label for="admin-email" class="block text-sm font-medium text-gray-700">Email</label>
+                        <input type="email" id="admin-email" value="admin@betterfootball.co.nz"
+                               class="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="admin@betterfootball.co.nz">
+                    </div>
+                    <div>
+                        <label for="admin-password" class="block text-sm font-medium text-gray-700">Password</label>
+                        <input type="password" id="admin-password" value="Redbarons321!"
+                               class="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="Redbarons321!">
+                    </div>
+                    <button id="admin-login-btn" class="btn-primary bg-indigo-600 text-white px-6 py-3 font-bold rounded-lg">
+                        Login as Admin
+                    </button>
+                    <p id="admin-login-message" class="text-sm text-red-500 text-center"></p>
+                </div>
+            </section>
+            
+            <div id="admin-tools" class="hidden space-y-8">
+                <p id="admin-status" class="text-center text-lg font-bold text-green-600">Admin Tools Activated</p>
+                
+                <section class="bg-white p-6 card">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Admin: Fixture Ingestion</h2>
+                    <p class="text-sm text-gray-600 mb-3">
+                        Paste the JSON array of fixtures here. This data comes from your Tuesday automation script.
+                        <button onclick="loadMockData()" class="text-indigo-500 hover:text-indigo-700 font-medium">Load Mock Data</button>
+                    </p>
+                    <textarea id="mock-data-area" rows="6" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder='[{"matchId": "123", "date": "2025-11-08", "time": "14:00", "home": "Team A", "away": "Team B", "pitch": "Main Field", "league": "Mens Prem"}, ...]'></textarea>
+                    <button id="ingest-btn" class="btn-primary w-full mt-4 bg-indigo-600 text-white px-6 py-3 font-bold rounded-lg disabled:opacity-50" disabled>
+                        1. Ingest/Update Weekly Fixtures
+                    </button>
+                    <p id="ingest-message" class="mt-2 text-sm text-green-600"></p>
+                </section>
+
+                <section class="bg-white p-6 card">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Admin: Schedule Approval</h2>
+                    <p id="admin-phase-message" class="text-sm font-semibold mb-4"></p>
+                    <div id="admin-fixture-list" class="space-y-4">
+                        <p class="text-gray-500">No fixtures loaded for approval. Ingest fixtures above.</p>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Referee View -->
+        <div id="referee-view" class="space-y-8 hidden">
+            <section class="bg-white p-6 card">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Referee: Volunteer for Games</h2>
+                <p id="ref-phase-message" class="text-lg font-bold mb-4"></p>
+                
+                <!-- Custom Name Input -->
+                <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <label for="ref-name-input" class="block text-sm font-medium text-gray-700 mb-2">
+                        My Referee Name (Use your preferred identifier/initials)
+                    </label>
+                    <input type="text" id="ref-name-input" 
+                           class="w-full p-2 border border-blue-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                           placeholder="e.g., Jane D. or JD Ref" maxlength="25">
+                </div>
+
+                <div id="referee-fixture-list" class="space-y-4">
+                    <p class="text-gray-500">No fixtures loaded for volunteering.</p>
+                </div>
+            </section>
+        </div>
+
+    </div>
+
+    <!-- Firebase SDK Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, writeBatch, updateDoc, Timestamp, setLogLevel, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- GLOBAL CONFIG & INIT ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'ref-scheduler-default-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, currentUserId = null, currentUserName = null;
+        let isAuthReady = false;
+        let isViewAdmin = true;
+        
+        // Use session storage for admin login persistence
+        let isAdminLoggedIn = sessionStorage.getItem('isAdminLoggedIn') === 'true'; 
+        let customRefName = localStorage.getItem('customRefName') || ''; 
+
+        // --- CUTOFF CONFIGURATION ---
+        const CUTOFF_DAY_INDEX = 5; // Friday (0=Sunday, 5=Friday, 6=Saturday)
+        const CUTOFF_HOUR = 12; // 12:00 PM (Noon)
+        const ADMIN_EMAIL = 'admin@betterfootball.co.nz';
+        const ADMIN_PASS = 'Redbarons321!';
+
+
+        const ELEMENTS = {
+            loading: document.getElementById('loading'),
+            userInfo: document.getElementById('user-info'),
+            toggleViewBtn: document.getElementById('toggle-view-btn'),
+            adminView: document.getElementById('admin-view'),
+            refereeView: document.getElementById('referee-view'),
+            mockDataArea: document.getElementById('mock-data-area'),
+            ingestBtn: document.getElementById('ingest-btn'),
+            ingestMessage: document.getElementById('ingest-message'),
+            adminList: document.getElementById('admin-fixture-list'),
+            refereeList: document.getElementById('referee-fixture-list'),
+            refNameInput: document.getElementById('ref-name-input'),
+            refPhaseMessage: document.getElementById('ref-phase-message'),
+            adminPhaseMessage: document.getElementById('admin-phase-message'),
+            adminLoginSection: document.getElementById('admin-login-section'),
+            adminTools: document.getElementById('admin-tools'),
+            adminLoginBtn: document.getElementById('admin-login-btn'),
+            adminLoginMessage: document.getElementById('admin-login-message'),
+            adminEmailInput: document.getElementById('admin-email'),
+            adminPasswordInput: document.getElementById('admin-password'),
+            adminStatus: document.getElementById('admin-status')
+        };
+        
+        const getAnonUserName = (userId) => 'Ref-' + userId.substring(0, 4);
+
+        // Utility to format date/time
+        const formatDate = (isoString) => {
+            // ISO date strings from ingestion use YYYY-MM-DD
+            const [year, month, day] = isoString.split('-').map(Number);
+            const date = new Date(year, month - 1, day);
+
+            // Check for invalid date (e.g., if ingestion format was wrong)
+            if (isNaN(date.getTime())) {
+                return 'Invalid Date';
+            }
+            
+            return date.toLocaleDateString('en-NZ', { weekday: 'short', month: 'short', day: 'numeric' });
+        };
+        const formatTime = (isoString) => {
+             // ISO time strings from ingestion use HH:MM
+            const date = new Date(`2000-01-01T${isoString}:00`);
+            return date.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', hour12: false });
+        };
+
+        // --- PHASE LOGIC ---
+        function isVolunteerPhase() {
+            const now = new Date();
+            const day = now.getDay();
+            const hours = now.getHours();
+
+            // Check if it's before Friday 12:00 PM (local time)
+            if (day < CUTOFF_DAY_INDEX) {
+                return true; 
+            }
+            if (day === CUTOFF_DAY_INDEX && hours < CUTOFF_HOUR) {
+                return true; 
+            }
+            return false; 
+        }
+
+        // --- FIREBASE INITIALIZATION & AUTH ---
+
+        window.onload = async () => {
+            if (Object.keys(firebaseConfig).length === 0) {
+                 ELEMENTS.loading.innerHTML = '<p class="text-red-600">ERROR: Firebase configuration is missing.</p>';
+                 return;
+            }
+
+            try {
+                ELEMENTS.loading.classList.remove('hidden');
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('error'); // Use 'error' to keep console clean
+
+                // Initialize custom name input and listener
+                ELEMENTS.refNameInput.value = customRefName;
+                ELEMENTS.refNameInput.addEventListener('input', (e) => {
+                    customRefName = e.target.value.trim();
+                    localStorage.setItem('customRefName', customRefName);
+                    // Force re-render of referee buttons after name change
+                    if (!isViewAdmin) {
+                         // We don't have fixture data here, so we reload the view state.
+                         // The onSnapshot listener handles the full render shortly.
+                         checkRefNameAndRenderButtons();
+                    }
+                });
+
+
+                // Check if mock data is valid to enable button
+                ELEMENTS.mockDataArea.addEventListener('input', () => {
+                    try {
+                        const json = JSON.parse(ELEMENTS.mockDataArea.value);
+                        ELEMENTS.ingestBtn.disabled = !Array.isArray(json) || json.length === 0;
+                    } catch {
+                        ELEMENTS.ingestBtn.disabled = true;
+                    }
+                });
+
+
+                await setPersistence(auth, browserSessionPersistence);
+
+                // Sign in with custom token or anonymously
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Auth state listener
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        isAuthReady = true;
+                        
+                        currentUserName = user.displayName || getAnonUserName(currentUserId);
+                        
+                        ELEMENTS.userInfo.innerHTML = `Signed in as: <span class="font-mono text-purple-700">${currentUserName}</span> (ID: <span class="font-mono text-purple-700">${currentUserId}</span>)`;
+                        
+                        setupUI();
+                        setupListeners();
+                    } else {
+                        currentUserId = null;
+                        isAuthReady = true;
+                    }
+                    ELEMENTS.loading.classList.add('hidden');
+                });
+
+            } catch (error) {
+                console.error("Firebase Init/Auth Error:", error);
+                ELEMENTS.loading.innerHTML = `<p class="text-red-600">Authentication Failed: ${error.message}</p>`;
+            }
+        };
+        
+        function setupUI() {
+            ELEMENTS.adminLoginBtn.onclick = handleAdminLogin;
+            ELEMENTS.toggleViewBtn.onclick = toggleView;
+            ELEMENTS.ingestBtn.onclick = handleIngestFixtures;
+            
+            // Set initial view state based on admin status
+            updateAdminViewVisibility(isAdminLoggedIn);
+            
+            // Ensure initial view matches the default state
+            toggleView(false); 
+        }
+
+        // FIX: Define a global function (attached to window) so the HTML button's onclick can access it.
+        window.loadMockData = function() {
+            ELEMENTS.mockDataArea.value = MOCK_FIXTURES;
+            ELEMENTS.ingestBtn.disabled = false;
+            ELEMENTS.mockDataArea.dispatchEvent(new Event('input'));
+        };
+
+        // --- ADMIN LOGIN LOGIC ---
+        function handleAdminLogin() {
+            const email = ELEMENTS.adminEmailInput.value.trim();
+            const password = ELEMENTS.adminPasswordInput.value;
+
+            if (email === ADMIN_EMAIL && password === ADMIN_PASS) {
+                isAdminLoggedIn = true;
+                sessionStorage.setItem('isAdminLoggedIn', 'true');
+                updateAdminViewVisibility(true);
+                ELEMENTS.adminLoginMessage.textContent = 'Login successful!';
+                ELEMENTS.adminLoginMessage.classList.remove('text-red-500');
+                ELEMENTS.adminLoginMessage.classList.add('text-green-600');
+                // Auto-switch to Admin view after login
+                toggleView(true); 
+
+            } else {
+                ELEMENTS.adminLoginMessage.textContent = 'Login failed: Invalid email or password.';
+                ELEMENTS.adminLoginMessage.classList.remove('text-green-600');
+                ELEMENTS.adminLoginMessage.classList.add('text-red-500');
+            }
+        }
+        
+        function updateAdminViewVisibility(loggedIn) {
+            ELEMENTS.adminLoginSection.classList.toggle('hidden', loggedIn);
+            ELEMENTS.adminTools.classList.toggle('hidden', !loggedIn);
+            ELEMENTS.adminStatus.textContent = loggedIn ? 'Admin Tools Activated' : 'Admin Tools Locked';
+        }
+
+        // --- FIREBASE LISTENERS & DATA ACCESS ---
+
+        function getCollectionPath() {
+            return `artifacts/${appId}/public/data/weekly_fixtures`;
+        }
+
+        function setupListeners() {
+            if (!db || !isAuthReady) return;
+
+            const q = collection(db, getCollectionPath());
+            onSnapshot(q, (snapshot) => {
+                const fixtures = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Ensure date/time strings are present
+                    if (!data.date || !data.time) return; 
+
+                    fixtures.push({ id: doc.id, ...data });
+                });
+
+                // Sort by date then time
+                fixtures.sort((a, b) => {
+                    const dateA = new Date(a.date + 'T' + a.time);
+                    const dateB = new Date(b.date + 'T' + b.time);
+                    return dateA - dateB;
+                });
+                
+                renderAdminView(fixtures);
+                renderRefereeView(fixtures);
+            }, (error) => {
+                console.error("Firestore Listener Error:", error);
+            });
+        }
+
+        // --- LOGIC FUNCTIONS ---
+
+        function toggleView(forceAdmin = null) {
+            isViewAdmin = forceAdmin !== null ? forceAdmin : !isViewAdmin;
+            ELEMENTS.toggleViewBtn.textContent = isViewAdmin ? 'Switch to Referee View' : 'Switch to Admin View';
+            ELEMENTS.adminView.classList.toggle('hidden', !isViewAdmin);
+            ELEMENTS.refereeView.classList.toggle('hidden', isViewAdmin);
+        }
+
+        async function handleIngestFixtures() {
+            const jsonText = ELEMENTS.mockDataArea.value.trim();
+            if (!jsonText) return;
+            
+            if (!isAdminLoggedIn) {
+                ELEMENTS.ingestMessage.textContent = 'Error: Admin login required to ingest fixtures.';
+                ELEMENTS.ingestMessage.classList.remove('text-green-600');
+                ELEMENTS.ingestMessage.classList.add('text-red-600');
+                return;
+            }
+
+
+            ELEMENTS.ingestBtn.disabled = true;
+            ELEMENTS.ingestBtn.textContent = 'Ingesting...';
+            ELEMENTS.ingestMessage.textContent = 'Processing and saving fixtures...';
+            ELEMENTS.ingestMessage.classList.remove('text-red-600');
+            ELEMENTS.ingestMessage.classList.add('text-green-600');
+
+            try {
+                const newFixtures = JSON.parse(jsonText);
+                if (!Array.isArray(newFixtures)) throw new Error("Input must be a JSON array.");
+                
+                const batch = writeBatch(db);
+                const fixtureCollection = collection(db, getCollectionPath());
+                let ingestedCount = 0;
+
+                for (const fixture of newFixtures) {
+                    // Create a deterministic ID
+                    const idParts = [fixture.date, fixture.time, fixture.home, fixture.away];
+                    const docId = idParts.map(p => (p || '').replace(/\s/g, '').toLowerCase().substring(0, 15)).join('-');
+
+                    const fixtureRef = doc(fixtureCollection, docId);
+                    
+                    const dataToSet = {
+                        matchId: docId,
+                        date: fixture.date, 
+                        time: fixture.time, 
+                        home: fixture.home,
+                        away: fixture.away,
+                        pitch: fixture.pitch || 'TBD', // Default value for pitch
+                        league: fixture.league || 'Unknown League', // Default value for league
+                        // Preserve existing data on merge
+                        assignedRefId: fixture.assignedRefId || null,
+                        assignedRefName: fixture.assignedRefName || null,
+                        refCandidates: fixture.refCandidates || [],
+                        lastUpdated: Timestamp.now()
+                    };
+
+                    batch.set(fixtureRef, dataToSet, { merge: true }); 
+
+                    ingestedCount++;
+                }
+
+                await batch.commit();
+
+                ELEMENTS.ingestMessage.textContent = `Successfully ingested and updated ${ingestedCount} fixtures.`;
+                ELEMENTS.mockDataArea.value = ''; 
+
+            } catch (error) {
+                console.error("Ingestion Error:", error);
+                ELEMENTS.ingestMessage.textContent = `Error during ingestion: ${error.message}`;
+                ELEMENTS.ingestMessage.classList.remove('text-green-600');
+                ELEMENTS.ingestMessage.classList.add('text-red-600');
+            } finally {
+                ELEMENTS.ingestBtn.disabled = false;
+                ELEMENTS.ingestBtn.textContent = '1. Ingest/Update Weekly Fixtures';
+            }
+        }
+
+        async function handleVolunteer(fixtureId) {
+            const name = ELEMENTS.refNameInput.value.trim();
+            if (!name) {
+                console.error("Please enter your referee name before volunteering.");
+                return;
+            }
+            if (!isVolunteerPhase()) {
+                console.error("Volunteering is locked. The admin approval phase is active.");
+                return;
+            }
+
+
+            const fixtureRef = doc(db, getCollectionPath(), fixtureId);
+            const currentRefId = currentUserId;
+            const currentRefName = name;
+            const newItem = { 
+                id: currentRefId, 
+                name: currentRefName, 
+                volunteeredAt: Timestamp.now()
+            };
+            
+            try {
+                const docSnap = await getDoc(fixtureRef);
+                
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    let candidates = data.refCandidates || [];
+
+                    const existingIndex = candidates.findIndex(candidate => candidate.id === currentRefId);
+
+                    if (existingIndex === -1) {
+                        candidates.push(newItem);
+                        await updateDoc(fixtureRef, { refCandidates: candidates });
+                    } else {
+                        // User volunteered again, update their name and timestamp
+                        candidates[existingIndex].name = currentRefName;
+                        candidates[existingIndex].volunteeredAt = Timestamp.now();
+                         await updateDoc(fixtureRef, { refCandidates: candidates });
+                    }
+                } else {
+                     console.error("Fixture document not found for volunteering.");
+                }
+            } catch (error) {
+                console.error("Error volunteering for fixture:", error);
+            }
+        }
+        
+        async function handleApprove(fixtureId, refId, refName) {
+            if (!isAdminLoggedIn) return; // Security check
+
+            const fixtureRef = doc(db, getCollectionPath(), fixtureId);
+            
+            if (isVolunteerPhase()) {
+                console.error("Approval is locked until the volunteer phase ends (Friday 12:00 PM).");
+                return;
+            }
+
+            await updateDoc(fixtureRef, {
+                assignedRefId: refId,
+                assignedRefName: refName,
+                // Clear candidates after assignment
+                refCandidates: [], 
+                lastUpdated: Timestamp.now()
+            });
+        }
+        
+        async function handleUnassign(fixtureId) {
+            if (!isAdminLoggedIn) return; // Security check
+
+            const fixtureRef = doc(db, getCollectionPath(), fixtureId);
+            
+            await updateDoc(fixtureRef, {
+                assignedRefId: null,
+                assignedRefName: null,
+                lastUpdated: Timestamp.now()
+            });
+        }
+        
+        // --- RENDER FUNCTIONS ---
+
+        function checkRefNameAndRenderButtons() {
+             // This is a placeholder to trigger the button states in the referee view.
+             // The full render is done via onSnapshot, but this updates button classes/disabled state instantly.
+             // We ensure we have a name entered and the phase is correct.
+             const namePresent = ELEMENTS.refNameInput.value.trim().length > 0;
+             const isVolunteeringAllowed = isVolunteerPhase();
+
+             // Update ref input styling
+             if (!isVolunteeringAllowed) {
+                 ELEMENTS.refNameInput.classList.add('cursor-not-allowed', 'bg-gray-100');
+             } else {
+                 ELEMENTS.refNameInput.classList.remove('cursor-not-allowed', 'bg-gray-100');
+             }
+             
+             // Update all buttons in the referee list if a full fixture render hasn't occurred yet
+             document.querySelectorAll('#referee-fixture-list button').forEach(button => {
+                 // Only update 'Volunteer' buttons that aren't already set to 'Volunteered' or 'Locked'
+                 if (button.textContent.includes('Volunteer')) {
+                     button.disabled = !namePresent || !isVolunteeringAllowed;
+                     button.classList.toggle('bg-indigo-600', !button.disabled);
+                     button.classList.toggle('hover:bg-indigo-700', !button.disabled);
+                     button.classList.toggle('bg-gray-400', button.disabled);
+                     button.classList.toggle('cursor-not-allowed', button.disabled);
+                 }
+             });
+        }
+
+
+        function renderAdminView(fixtures) {
+            const isAdminPhase = !isVolunteerPhase();
+            
+            ELEMENTS.adminPhaseMessage.textContent = isAdminPhase
+                ? "Admin Approval is unlocked. You can now assign referees (Admin Logged In)."
+                : "Admin Approval is locked until Friday 12:00 PM (Volunteer Phase is active).";
+            
+            ELEMENTS.adminPhaseMessage.className = isAdminPhase
+                ? "text-lg font-bold text-green-600 mb-4"
+                : "text-lg font-bold text-red-500 mb-4";
+
+            if (!fixtures.length) {
+                ELEMENTS.adminList.innerHTML = '<p class="text-gray-500">No fixtures loaded for approval. Ingest fixtures above.</p>';
+                return;
+            }
+
+            ELEMENTS.adminList.innerHTML = fixtures.map(fixture => {
+                const assigned = fixture.assignedRefName;
+                const candidates = fixture.refCandidates || [];
+                const isAssigned = !!assigned;
+
+                const candidateListHTML = candidates
+                    .sort((a, b) => b.volunteeredAt.toMillis() - a.volunteeredAt.toMillis()) // Sort by most recent volunteer first
+                    .map(candidate => `
+                    <div class="flex justify-between items-center bg-gray-100 p-2 rounded-lg my-1">
+                        <span class="font-semibold text-gray-700">${candidate.name}</span>
+                        <button onclick="handleApprove('${fixture.id}', '${candidate.id}', '${candidate.name}')" 
+                                class="text-xs ${isAdminLoggedIn && isAdminPhase ? 'bg-indigo-500 hover:bg-indigo-600' : 'bg-gray-400 cursor-not-allowed'} text-white px-3 py-1 rounded transition" 
+                                ${isAdminLoggedIn && isAdminPhase ? '' : 'disabled'}>
+                            Approve
+                        </button>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="p-4 border-b border-gray-200 ${isAssigned ? 'bg-green-50' : 'bg-yellow-50'} card">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-grow">
+                                <h3 class="text-lg font-bold text-gray-800">${fixture.home} vs ${fixture.away}</h3>
+                                <p class="text-sm text-indigo-700 font-medium">${fixture.league}</p>
+                                <p class="text-xs text-gray-500">
+                                    ${formatDate(fixture.date)} @ ${formatTime(fixture.time)} | Pitch: ${fixture.pitch}
+                                </p>
+                            </div>
+                            <div class="text-right">
+                                ${isAssigned 
+                                    ? `<p class="text-sm font-bold text-green-600 mb-1">Assigned: ${assigned}</p>
+                                       <button onclick="handleUnassign('${fixture.id}')" 
+                                               class="text-xs ${isAdminLoggedIn ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-400 cursor-not-allowed'} text-white px-2 py-1 rounded transition"
+                                               ${isAdminLoggedIn ? '' : 'disabled'}>
+                                           Unassign
+                                       </button>`
+                                    : `<p class="text-sm font-semibold text-red-500">UNASSIGNED</p>`
+                                }
+                            </div>
+                        </div>
+
+                        ${candidates.length > 0 ? `
+                            <div class="mt-3 pt-3 border-t border-gray-200">
+                                <h4 class="text-sm font-semibold mb-2">Referee Candidates (${candidates.length})</h4>
+                                ${candidateListHTML}
+                            </div>
+                        ` : ''}
+                        
+                        ${candidates.length == 0 && !isAssigned ? `
+                             <p class="text-sm text-gray-500 mt-2">No referees have volunteered yet.</p>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+            
+            window.handleApprove = handleApprove;
+            window.handleUnassign = handleUnassign;
+        }
+
+        function renderRefereeView(fixtures) {
+            const isVolunteeringAllowed = isVolunteerPhase();
+            const namePresent = ELEMENTS.refNameInput.value.trim().length > 0;
+
+            ELEMENTS.refPhaseMessage.innerHTML = isVolunteeringAllowed
+                ? `You are in the <span class="text-green-600">Volunteer Phase.</span> Enter your name and click "Volunteer".`
+                : `<span class="text-red-600">Approval Phase Locked:</span> Final assignments are now being made by the Admin.`;
+
+            // Disable name input if the phase is locked
+            ELEMENTS.refNameInput.disabled = !isVolunteeringAllowed;
+            ELEMENTS.refNameInput.placeholder = isVolunteeringAllowed ? "e.g., Jane D. or JD Ref" : "Volunteering is locked";
+
+
+            if (!fixtures.length) {
+                ELEMENTS.refereeList.innerHTML = '<p class="text-gray-500">No fixtures loaded for volunteering.</p>';
+                return;
+            }
+
+            ELEMENTS.refereeList.innerHTML = fixtures.map(fixture => {
+                const candidates = fixture.refCandidates || [];
+                const assigned = fixture.assignedRefName;
+                const isAssigned = !!assigned;
+                
+                const isCandidate = candidates.some(c => c.id === currentUserId);
+                const isReferee = isAssigned && fixture.assignedRefId === currentUserId;
+
+                let statusHTML;
+                let actionButton;
+                const canVolunteer = isVolunteeringAllowed && namePresent && !isAssigned && !isCandidate;
+
+                const buttonClasses = (enabled) => 
+                    enabled 
+                    ? 'bg-indigo-600 hover:bg-indigo-700' 
+                    : 'bg-gray-400 cursor-not-allowed';
+
+                if (isReferee) {
+                    statusHTML = `<span class="ref-tag bg-green-500 text-white">YOU ARE ASSIGNED</span>`;
+                    actionButton = '';
+                } else if (isAssigned) {
+                    statusHTML = `<span class="ref-tag bg-gray-300 text-gray-700">Assigned to: ${assigned}</span>`;
+                    actionButton = '';
+                } else if (isCandidate) {
+                    const yourName = candidates.find(c => c.id === currentUserId).name;
+                    statusHTML = `<span class="ref-tag bg-yellow-500 text-gray-900">YOU VOLUNTEERED (as ${yourName})</span>`;
+                    actionButton = `
+                        <button disabled class="text-xs ${buttonClasses(false)} text-white px-3 py-1 rounded transition">
+                            Volunteered
+                        </button>
+                    `;
+                } else {
+                     // Open to volunteer or locked due to phase/name
+                    statusHTML = canVolunteer 
+                        ? `<span class="ref-tag bg-blue-100 text-blue-700">Open to Volunteer</span>`
+                        : `<span class="ref-tag bg-gray-300 text-gray-700">${isVolunteeringAllowed ? 'Enter Name Above' : 'Locked'}</span>`;
+                    
+                    actionButton = `
+                        <button onclick="handleVolunteer('${fixture.id}')" 
+                                class="text-xs ${buttonClasses(canVolunteer)} text-white px-3 py-1 rounded transition"
+                                ${canVolunteer ? '' : 'disabled'}>
+                            Volunteer
+                        </button>
+                    `;
+                }
+                
+                return `
+                    <div class="p-4 border-b border-gray-200 bg-white card">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-grow">
+                                <h3 class="text-lg font-bold text-gray-800">${fixture.home} vs ${fixture.away}</h3>
+                                <p class="text-sm text-indigo-700 font-medium">${fixture.league}</p>
+                                <p class="text-xs text-gray-500">
+                                    ${formatDate(fixture.date)} @ ${formatTime(fixture.time)} | Pitch: ${fixture.pitch}
+                                </p>
+                                <div class="mt-2 flex flex-wrap items-center">
+                                    ${statusHTML}
+                                    ${(candidates.length > 0 && !isReferee && !isCandidate) ? `<span class="text-xs text-gray-500 ml-2">(${candidates.length} candidate(s) volunteered)</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="text-right mt-1">
+                                ${actionButton}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            window.handleVolunteer = handleVolunteer;
+            checkRefNameAndRenderButtons(); // Ensure button state is correct immediately
+        }
+
+        // --- Mock Data for Testing (Updated) ---
+        const MOCK_FIXTURES = JSON.stringify([
+            // Fixtures from 08 Nov 2025 (Saturday) - Example 11s
+            { "date": "2025-11-08", "time": "14:00", "home": "Ballers FC", "away": "Dynamo Kev FC", "pitch": "S1", "league": "Mens Prem 11s" },
+            { "date": "2025-11-08", "time": "15:30", "home": "Far Canal", "away": "Wellington Right Wingers", "pitch": "S1", "league": "St Pats 11s" },
+            
+            // Fixtures from 11 Nov 2025 (Tuesday) - Example 7s/5s Night Availability
+            { "date": "2025-11-11", "time": "Night", "home": "Mixed 7s Tuesday", "away": "OPEN NIGHT AVAILABILITY", "pitch": "Multiple", "league": "Night Referees" },
+            
+            // Fixtures from 13 Nov 2025 (Thursday) - Example 11s
+            { "date": "2025-11-13", "time": "19:00", "home": "VUWAFC", "away": "Wanderers", "pitch": "T1", "league": "Uni Cup 11s" }
+        ]);
+
+    </script>
+</body>
+</html>
