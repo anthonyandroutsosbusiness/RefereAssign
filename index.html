@@ -3,191 +3,453 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weekly Fixtures Schedule</title>
-    <!-- Load Tailwind CSS -->
+    <title>Simple Referee Assignment System</title>
+    <!-- Tailwind CSS for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Custom font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8f9fa;
+            background-color: #f3f4f6;
         }
-        /* Custom scrollbar for better aesthetics */
-        .fixture-container::-webkit-scrollbar {
-            width: 8px;
-        }
-        .fixture-container::-webkit-scrollbar-thumb {
-            background-color: #cbd5e1; /* Slate 300 */
-            border-radius: 4px;
+        .fixture-card {
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
         }
     </style>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'primary-blue': '#1e3a8a', /* Dark Blue 800 */
-                        'accent-yellow': '#facc15', /* Amber 400 */
-                    }
-                }
-            }
-        }
-    </script>
 </head>
 <body class="min-h-screen p-4 sm:p-8">
 
-    <div id="app" class="max-w-4xl mx-auto">
-        <header class="text-center py-6 sm:py-8 bg-primary-blue text-white rounded-xl shadow-lg mb-8">
-            <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Weekly Football Fixtures</h1>
-            <p class="mt-1 text-sm sm:text-base opacity-90">Sourced automatically from Saturday to Thursday</p>
-        </header>
+    <!-- Status Message Area -->
+    <div id="status-message" class="fixed top-4 left-1/2 -translate-x-1/2 p-3 rounded-xl shadow-lg z-50 hidden transition-all duration-300 transform" style="max-width: 90vw;"></div>
 
-        <div id="loading" class="text-center p-8 text-lg text-gray-600">
-            <svg class="animate-spin h-8 w-8 mr-3 inline-block text-primary-blue" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Loading fixtures...
+    <!-- Right-Side User/Admin Panel -->
+    <div id="user-info-bar" class="w-full max-w-sm mx-auto bg-white p-4 rounded-xl shadow-2xl border-t-4 border-red-600 mb-8 sm:mb-0 sm:float-right sm:sticky sm:top-8">
+        <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">My Identity</h2>
+        
+        <!-- Identity Input Form -->
+        <div id="identity-form" class="space-y-3">
+            <input type="text" id="referee-name-input" placeholder="Enter Your Full Name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
+            <button onclick="setIdentity()" class="w-full bg-red-600 text-white p-3 rounded-lg font-semibold hover:bg-red-700 transition duration-150 shadow-md">
+                Set Name & View Fixtures
+            </button>
         </div>
 
-        <div id="fixtures-list" class="space-y-6">
-            <!-- Fixture cards will be inserted here by JavaScript -->
+        <!-- Identity Display (after setting name) -->
+        <div id="identity-display" class="hidden">
+            <p class="mb-2 text-sm"><span class="font-semibold text-gray-700">Name:</span> <span id="display-ref-name" class="font-bold text-lg text-red-600"></span></p>
+            <p class="mb-2 text-sm"><span class="font-semibold text-gray-700">Role:</span> <span id="display-role" class="font-bold text-red-600">Referee</span></p>
+            <button onclick="clearIdentity()" class="text-xs text-gray-500 hover:text-red-500">Change Name</button>
         </div>
 
-        <div id="error-message" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mt-8 rounded-lg shadow-md" role="alert">
-            <p class="font-bold">Data Error</p>
-            <p id="error-text">Could not load the fixtures data. Please check if fixtures.json exists and is valid.</p>
+        <div id="admin-info" class="mt-4 border-t pt-3 hidden">
+            <p class="text-xs text-gray-500 font-semibold">Admin Mode Activated (Username: Admin)</p>
         </div>
 
-        <div id="no-fixtures-message" class="hidden bg-yellow-100 border-l-4 border-accent-yellow text-yellow-800 p-6 mt-8 rounded-lg shadow-md" role="alert">
-            <p class="font-bold">No Fixtures Scheduled</p>
-            <p>There are no fixtures found for the target Saturday-to-Thursday period this week. The next update is scheduled for Saturday.</p>
+        <!-- Data Management -->
+        <div id="data-management" class="mt-4 border-t pt-3 hidden">
+             <button onclick="loadSampleFixtures()" class="w-full bg-indigo-600 text-white text-sm p-2 rounded-lg font-semibold hover:bg-indigo-700 transition duration-150 shadow-md">
+                Load Sample Fixtures (Run Once)
+            </button>
         </div>
 
     </div>
+    
+    <!-- Main Content Grid -->
+    <main class="w-full max-w-4xl mx-auto sm:mr-96">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-gray-900 mb-2">Weekly Match Assignments</h1>
+            <p id="ref-greeting" class="text-xl text-gray-600">Please set your name to view the schedule.</p>
+        </header>
 
-    <script>
-        // DOM elements
-        const fixturesList = document.getElementById('fixtures-list');
-        const loadingSpinner = document.getElementById('loading');
-        const errorMessage = document.getElementById('error-message');
-        const noFixturesMessage = document.getElementById('no-fixtures-message');
+        <!-- Fixtures List -->
+        <div id="fixtures-list" class="space-y-6">
+            <div id="loading-indicator" class="text-center text-gray-500 py-10">
+                <p class="mt-3">Awaiting identity setup and sample data load...</p>
+            </div>
+        </div>
 
-        /**
-         * Groups fixtures by their date.
-         * @param {Array<Object>} fixtures - The list of all fixtures.
-         * @returns {Object<string, Array<Object>>} - Fixtures grouped by date string.
-         */
-        function groupFixturesByDate(fixtures) {
-            return fixtures.reduce((acc, fixture) => {
-                const date = fixture.date;
-                if (!acc[date]) {
-                    acc[date] = [];
+    </main>
+
+    <!-- Firebase Imports and Script -->
+    <script type="module">
+        // Global variables provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // Configuration
+        const ADMIN_NAME = 'Admin';
+        const FIRES_COLLECTION_PATH = `/artifacts/${appId}/public/data/fixtures`;
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, doc, updateDoc, onSnapshot, getDoc, writeBatch, query, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        
+        // Global State
+        let app, db, auth;
+        let userId = null;
+        let userName = ''; 
+        let userRole = 'referee';
+
+        // --- Utility Functions ---
+
+        /** Shows a status message near the top center */
+        function showStatus(type, message) {
+            const statusDiv = document.getElementById('status-message');
+            statusDiv.textContent = message;
+            
+            // Set base classes
+            statusDiv.className = 'fixed top-4 left-1/2 -translate-x-1/2 p-3 rounded-xl shadow-xl z-50 transition-all duration-300 transform';
+            statusDiv.classList.remove('hidden');
+
+            // Set type-specific classes
+            statusDiv.classList.remove('bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-yellow-100', 'text-yellow-800');
+            if (type === 'success') {
+                statusDiv.classList.add('bg-green-100', 'text-green-800');
+            } else if (type === 'danger') {
+                statusDiv.classList.add('bg-red-100', 'text-red-800');
+            } else if (type === 'warning') {
+                statusDiv.classList.add('bg-yellow-100', 'text-yellow-800');
+            }
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        // --- Identity Management (Replacing Auth) ---
+
+        function updateUIBasedOnIdentity() {
+            const display = document.getElementById('identity-display');
+            const form = document.getElementById('identity-form');
+            const greeting = document.getElementById('ref-greeting');
+            const dataManagement = document.getElementById('data-management');
+            const adminInfo = document.getElementById('admin-info');
+
+            if (userName) {
+                form.classList.add('hidden');
+                display.classList.remove('hidden');
+                document.getElementById('display-ref-name').textContent = userName;
+                greeting.textContent = `Welcome, ${userName}. Volunteer for your assignments below.`;
+
+                if (userName === ADMIN_NAME) {
+                    userRole = 'admin';
+                    document.getElementById('display-role').textContent = 'Administrator';
+                    document.getElementById('display-role').classList.add('text-green-600');
+                    dataManagement.classList.remove('hidden');
+                    adminInfo.classList.remove('hidden');
+                } else {
+                    userRole = 'referee';
+                    document.getElementById('display-role').textContent = 'Referee';
+                    document.getElementById('display-role').classList.remove('text-green-600');
+                    dataManagement.classList.add('hidden');
+                    adminInfo.classList.add('hidden');
                 }
-                acc[date].push(fixture);
-                return acc;
-            }, {});
+
+                document.getElementById('loading-indicator').innerHTML = '<p class="mt-3">Fetching live schedule data...</p>';
+            } else {
+                form.classList.remove('hidden');
+                display.classList.add('hidden');
+                greeting.textContent = 'Please set your name to view the schedule.';
+            }
         }
         
-        /**
-         * Formats a date string (YYYY-MM-DD) into a readable format.
-         * @param {string} dateString - Date in YYYY-MM-DD format.
-         * @returns {string} - Formatted date string (e.g., "Saturday, 09 November 2025").
-         */
-        function formatReadableDate(dateString) {
-            try {
-                // Use the user's local timezone for formatting
-                const date = new Date(dateString + 'T00:00:00'); 
-                return date.toLocaleDateString(undefined, { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                });
-            } catch (e) {
-                return dateString; // Fallback
+        window.setIdentity = function() {
+            const inputName = document.getElementById('referee-name-input').value.trim();
+            if (!inputName) {
+                return showStatus('danger', 'Please enter a name or username.');
             }
-        }
+            // Use the name for the ID and display name
+            userId = inputName.toLowerCase().replace(/\s/g, '-'); 
+            userName = inputName;
+            updateUIBasedOnIdentity();
+        };
 
-        /**
-         * Renders the fixtures list to the DOM.
-         * @param {Array<Object>} fixtures - The filtered and structured fixture data.
-         */
-        function renderFixtures(fixtures) {
-            loadingSpinner.classList.add('hidden');
-            
-            if (fixtures.length === 0) {
-                noFixturesMessage.classList.remove('hidden');
+        window.clearIdentity = function() {
+            userId = null;
+            userName = '';
+            document.getElementById('referee-name-input').value = '';
+            updateUIBasedOnIdentity();
+        };
+
+        // --- Core Firebase Setup ---
+
+        async function initFirebase() {
+            if (!Object.keys(firebaseConfig).length) {
+                console.error("Firebase config is missing.");
+                document.getElementById('loading-indicator').textContent = 'ERROR: Firebase config missing.';
                 return;
             }
-
-            const groupedFixtures = groupFixturesByDate(fixtures);
             
-            for (const date in groupedFixtures) {
-                const dateHeader = document.createElement('h2');
-                dateHeader.className = 'text-2xl font-bold mt-8 mb-4 border-b-2 border-primary-blue pb-2 text-primary-blue';
-                dateHeader.textContent = formatReadableDate(date);
-                fixturesList.appendChild(dateHeader);
-
-                const dayContainer = document.createElement('div');
-                dayContainer.className = 'grid gap-4 sm:grid-cols-2';
-
-                groupedFixtures[date].forEach(fixture => {
-                    const card = document.createElement('div');
-                    card.className = 'bg-white p-4 rounded-lg shadow-md hover:shadow-xl transition duration-300 border-t-4 border-accent-yellow';
-
-                    card.innerHTML = `
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-xs font-semibold uppercase text-gray-500">${fixture.league}</span>
-                            <span class="text-lg font-bold text-green-600">${fixture.time}</span>
-                        </div>
-                        <div class="text-xl font-extrabold text-gray-800">
-                            ${fixture.home} 
-                            <span class="text-sm font-normal text-gray-500 mx-1">vs</span> 
-                            ${fixture.away}
-                        </div>
-                        <div class="mt-2 text-sm text-gray-600">
-                            <span class="font-semibold">Venue:</span> ${fixture.pitch}
-                        </div>
-                    `;
-                    dayContainer.appendChild(card);
-                });
-                fixturesList.appendChild(dayContainer);
-            }
-        }
-
-        /**
-         * Main function to fetch and display data.
-         */
-        async function loadFixtures() {
             try {
-                // Fetch the file generated and committed by the GitHub Action
-                const response = await fetch('fixtures.json'); 
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Sign in anonymously to get a UID for general access
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
                 }
-                
-                const data = await response.json();
-                
-                if (!Array.isArray(data)) {
-                    throw new Error("JSON file content is not a valid array.");
-                }
-                
-                renderFixtures(data);
+
+                // Check if the user is authenticated (essential for Firestore security rules)
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        // User is authenticated, now we can set up the data listener
+                        setupDataListener();
+                        document.getElementById('loading-indicator').innerHTML = '<p class="mt-3">Awaiting identity setup and sample data load...</p>';
+                    } else {
+                        document.getElementById('loading-indicator').textContent = 'Authentication failed. Check Firebase setup.';
+                    }
+                });
 
             } catch (error) {
-                loadingSpinner.classList.add('hidden');
-                errorMessage.classList.remove('hidden');
-                document.getElementById('error-text').textContent = "Could not load the fixtures data. Error: " + error.message;
-                console.error('Failed to fetch fixtures.json:', error);
+                console.error("Firebase initialization failed:", error);
+                showStatus('danger', `Setup Error: ${error.message}`);
+                document.getElementById('loading-indicator').textContent = `Setup Error: ${error.message}`;
             }
         }
 
-        // Run the load function when the page loads
-        window.onload = loadFixtures;
+        // --- Sample Data Injection ---
 
+        const SAMPLE_FIXTURES = [
+            { date: "2025-11-09", time: "14:00", home: "Eagles FC", away: "Lions United", pitch: "Field 1", league: "Premier 11s" },
+            { date: "2025-11-09", time: "16:00", home: "Warriors SC", away: "Titans AFC", pitch: "Field 3", league: "Premier 11s" },
+            { date: "2025-11-10", time: "10:30", home: "Dragons Reserves", away: "Sharks FC", pitch: "Field 2", league: "Divisional 11s" },
+            { date: "2025-11-10", time: "12:30", home: "Vipers Youth", away: "Bears U18", pitch: "Field 1", league: "Divisional 11s" },
+            { date: "2025-11-12", time: "19:30", home: "Midweek Marvels", away: "Tuesday Tigers", pitch: "Field 4", league: "Social 7s League" },
+            { date: "2025-11-14", time: "20:30", home: "Thursday Thrillers", away: "Last Minute XI", pitch: "Field 5", league: "Social 7s League" },
+        ];
+
+        window.loadSampleFixtures = async function() {
+            if (userRole !== ADMIN_NAME.toLowerCase()) {
+                return showStatus('danger', 'Only the Admin can load sample data.');
+            }
+            if (!db) return showStatus('danger', 'Database not ready.');
+
+            showStatus('warning', 'Loading sample data. This will delete all current fixtures...');
+
+            const fixturesCollection = collection(db, FIRES_COLLECTION_PATH);
+            const batch = writeBatch(db);
+            
+            try {
+                // 1. Delete all existing fixtures
+                const snapshot = await getDocs(query(fixturesCollection));
+                snapshot.docs.forEach(docSnapshot => {
+                    batch.delete(docSnapshot.ref);
+                });
+
+                // 2. Add sample fixtures
+                SAMPLE_FIXTURES.forEach(fixture => {
+                    const fixtureId = doc(fixturesCollection).id; 
+                    const newFixture = {
+                        ...fixture,
+                        matchId: fixtureId,
+                        assignedRef: null,
+                        volunteers: [], // Array of names that have volunteered
+                        status: 'open',
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp(),
+                    };
+                    
+                    batch.set(doc(fixturesCollection, fixtureId), newFixture);
+                });
+
+                await batch.commit();
+                showStatus('success', `✅ Successfully loaded ${SAMPLE_FIXTURES.length} sample fixtures.`);
+
+            } catch (error) {
+                console.error("Sample Data Load Failed:", error);
+                showStatus('danger', `Sample Data Load Failed: ${error.message}`);
+            }
+        };
+
+
+        // --- Data Listener and UI Rendering ---
+        function setupDataListener() {
+            const fixturesRef = collection(db, FIRES_COLLECTION_PATH);
+            
+            // Listen for real-time changes
+            onSnapshot(fixturesRef, (snapshot) => {
+                const fixtures = [];
+                snapshot.forEach(doc => {
+                    fixtures.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // Sort by date then time
+                fixtures.sort((a, b) => {
+                    if (a.date !== b.date) {
+                        return a.date.localeCompare(b.date);
+                    }
+                    return a.time.localeCompare(b.time);
+                });
+
+                renderFixtures(fixtures);
+                document.getElementById('loading-indicator').classList.add('hidden');
+            }, (error) => {
+                console.error("Firestore listen failed:", error);
+                showStatus('danger', 'Error fetching live schedule data.');
+                document.getElementById('loading-indicator').textContent = 'Error loading data.';
+            });
+        }
+
+        function renderFixtures(fixtures) {
+            const list = document.getElementById('fixtures-list');
+            list.innerHTML = ''; 
+
+            if (fixtures.length === 0) {
+                 list.innerHTML = `<p class="text-center text-gray-500 py-10">No fixtures loaded yet. Admin must set their name to "${ADMIN_NAME}" and click "Load Sample Fixtures."</p>`;
+                 return;
+            }
+
+            fixtures.forEach(fixture => {
+                const card = document.createElement('div');
+                
+                const volunteerCount = fixture.volunteers ? fixture.volunteers.length : 0;
+                const isVolunteer = fixture.volunteers && userId && fixture.volunteers.includes(userName);
+                
+                const baseClasses = "fixture-card p-4 rounded-xl transition duration-300";
+                
+                if (fixture.status === 'assigned') {
+                    card.className = `${baseClasses} bg-green-50 border-l-4 border-green-500`;
+                } else if (isVolunteer) {
+                     card.className = `${baseClasses} bg-yellow-50 border-l-4 border-yellow-500 hover:shadow-lg`;
+                } else {
+                    card.className = `${baseClasses} bg-white border-l-4 border-red-500 hover:shadow-xl`;
+                }
+
+                let actionHtml = '';
+                
+                if (userName) { // Only show actions if identity is set
+                    if (userRole === 'admin') {
+                        // --- Admin View: Approval ---
+                        if (fixture.status === 'open') {
+                            actionHtml = `<p class="text-sm text-gray-500 mb-2">Volunteers: <span class="font-semibold text-gray-800">${volunteerCount}</span></p>`;
+                            if (volunteerCount > 0) {
+                                actionHtml += `
+                                    <div class="space-y-2">
+                                        <p class="font-semibold text-sm mb-1">Candidates:</p>
+                                        ${fixture.volunteers.map(volunteerName => `
+                                            <div class="flex items-center justify-between bg-white p-2 border rounded-lg shadow-sm">
+                                                <span class="text-sm font-semibold text-gray-700 truncate">${volunteerName}</span>
+                                                <button onclick="handleApproval('${fixture.id}', '${volunteerName}')" class="ml-2 text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 transition">Approve</button>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                `;
+                            }
+                        } else if (fixture.status === 'assigned') {
+                            actionHtml = `<p class="text-lg font-bold text-green-600">Assigned: ${fixture.assignedRef}</p>`;
+                        }
+
+                    } else {
+                        // --- Referee View: Volunteer ---
+                        if (fixture.status === 'open') {
+                            if (isVolunteer) {
+                                actionHtml = `
+                                    <button onclick="handleVolunteer('${fixture.id}', false)" class="w-full bg-red-500 text-white p-2 rounded-lg font-semibold hover:bg-red-600 transition duration-150">
+                                        Cancel Volunteer (${volunteerCount} interested)
+                                    </button>
+                                `;
+                            } else {
+                                actionHtml = `
+                                    <button onclick="handleVolunteer('${fixture.id}', true)" class="w-full bg-indigo-600 text-white p-2 rounded-lg font-semibold hover:bg-indigo-700 transition duration-150">
+                                        Volunteer for Match (${volunteerCount} interested)
+                                    </button>
+                                `;
+                            }
+                        } else if (fixture.status === 'assigned') {
+                            if (fixture.assignedRef === userName) {
+                                actionHtml = `<p class="text-lg font-bold text-green-600">YOU ARE ASSIGNED</p>`;
+                            } else {
+                                actionHtml = `<p class="text-lg font-bold text-gray-500">ASSIGNED to ${fixture.assignedRef}</p>`;
+                            }
+                        }
+                    }
+                } else {
+                    actionHtml = '<p class="text-center text-sm text-gray-500">Set your name to volunteer.</p>';
+                }
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-3 border-b pb-2">
+                        <div>
+                            <span class="text-xl font-extrabold text-gray-900 block">${fixture.date}</span>
+                            <span class="text-sm font-semibold text-red-600">${fixture.time}</span>
+                        </div>
+                         <div class="text-right">
+                            <span class="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-medium">${fixture.league}</span>
+                            <span class="inline-block bg-gray-200 rounded-full px-3 py-1 mt-1 text-sm font-medium">${fixture.pitch}</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col mb-4">
+                        <p class="text-2xl font-bold text-gray-800">${fixture.home} vs ${fixture.away}</p>
+                    </div>
+                    <div class="pt-3 border-t">
+                        ${actionHtml}
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        // --- Action Handlers ---
+
+        /** Referee volunteers or cancels volunteering for a match. */
+        window.handleVolunteer = async function(matchId, isVolunteering) {
+            if (!userName || userRole !== 'referee') return showStatus('danger', 'Please set your name first.');
+
+            const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
+            const refDoc = await getDoc(matchRef);
+            if (!refDoc.exists()) return showStatus('danger', 'Match not found.');
+            
+            const data = refDoc.data();
+            let volunteers = data.volunteers || [];
+
+            if (isVolunteering) {
+                if (!volunteers.includes(userName)) {
+                    volunteers.push(userName);
+                    showStatus('success', `✅ ${userName}, you have volunteered!`);
+                }
+            } else {
+                volunteers = volunteers.filter(name => name !== userName);
+                showStatus('warning', '❌ Volunteering cancelled.');
+            }
+
+            try {
+                await updateDoc(matchRef, { volunteers: volunteers });
+            } catch(e) {
+                console.error("Volunteer update failed:", e);
+                showStatus('danger', 'Failed to update volunteer status.');
+            }
+        };
+
+        /** Admin approves a referee for a match. */
+        window.handleApproval = async function(matchId, assignedRefName) {
+            if (userRole !== 'admin') return showStatus('danger', 'Only administrators can approve assignments.');
+            if (userName !== ADMIN_NAME) return showStatus('danger', 'You must be logged in as Admin to approve.');
+
+            const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
+
+            try {
+                await updateDoc(matchRef, {
+                    assignedRef: assignedRefName,
+                    status: 'assigned',
+                    // Clear all other volunteers, only keep the assigned referee's name
+                    volunteers: [assignedRefName], 
+                    updatedAt: serverTimestamp()
+                });
+                showStatus('success', `✅ Referee ${assignedRefName} approved for match.`);
+            } catch(e) {
+                console.error("Approval failed:", e);
+                showStatus('danger', 'Failed to approve assignment.');
+            }
+        };
+
+        // Initialize the application
+        initFirebase();
     </script>
-
 </body>
 </html>
