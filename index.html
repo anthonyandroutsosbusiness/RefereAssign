@@ -45,7 +45,8 @@
             <h1 class="text-4xl font-extrabold text-indigo-700">Weekly Fixture Management</h1>
             <p id="user-info" class="text-sm text-gray-600 mt-2"></p>
             <div class="mt-4 flex justify-center space-x-4">
-                <button id="toggle-view-btn" class="bg-purple-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-600 transition duration-150">
+                <!-- ADDED onclick handler -->
+                <button id="toggle-view-btn" onclick="window.toggleView()" class="bg-purple-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-600 transition duration-150">
                     Switch to Referee View
                 </button>
             </div>
@@ -72,7 +73,8 @@
                         <input type="password" id="admin-password" value="Redbarons321!"
                                class="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="Redbarons321!">
                     </div>
-                    <button id="admin-login-btn" class="btn-primary bg-indigo-600 text-white px-6 py-3 font-bold rounded-lg">
+                    <!-- ADDED onclick handler -->
+                    <button id="admin-login-btn" onclick="window.handleAdminLogin()" class="btn-primary bg-indigo-600 text-white px-6 py-3 font-bold rounded-lg">
                         Login as Admin
                     </button>
                     <p id="admin-login-message" class="text-sm text-red-500 text-center"></p>
@@ -290,15 +292,15 @@
         };
         
         function setupUI() {
-            ELEMENTS.adminLoginBtn.onclick = handleAdminLogin;
-            ELEMENTS.toggleViewBtn.onclick = toggleView;
+            // Removed: ELEMENTS.adminLoginBtn.onclick = handleAdminLogin;
+            // Removed: ELEMENTS.toggleViewBtn.onclick = toggleView;
             ELEMENTS.ingestBtn.onclick = handleIngestFixtures;
             
             // Set initial view state based on admin status
             updateAdminViewVisibility(isAdminLoggedIn);
             
             // Ensure initial view matches the default state
-            toggleView(false); 
+            window.toggleView(false); // Call the global function
         }
 
         // FIX: Define a global function (attached to window) so the HTML button's onclick can access it.
@@ -308,8 +310,8 @@
             ELEMENTS.mockDataArea.dispatchEvent(new Event('input'));
         };
 
-        // --- ADMIN LOGIN LOGIC ---
-        function handleAdminLogin() {
+        // --- ADMIN LOGIN LOGIC (Made global for inline HTML use) ---
+        window.handleAdminLogin = function() {
             const email = ELEMENTS.adminEmailInput.value.trim();
             const password = ELEMENTS.adminPasswordInput.value;
 
@@ -321,14 +323,14 @@
                 ELEMENTS.adminLoginMessage.classList.remove('text-red-500');
                 ELEMENTS.adminLoginMessage.classList.add('text-green-600');
                 // Auto-switch to Admin view after login
-                toggleView(true); 
+                window.toggleView(true); 
 
             } else {
                 ELEMENTS.adminLoginMessage.textContent = 'Login failed: Invalid email or password.';
                 ELEMENTS.adminLoginMessage.classList.remove('text-green-600');
                 ELEMENTS.adminLoginMessage.classList.add('text-red-500');
             }
-        }
+        };
         
         function updateAdminViewVisibility(loggedIn) {
             ELEMENTS.adminLoginSection.classList.toggle('hidden', loggedIn);
@@ -370,14 +372,14 @@
             });
         }
 
-        // --- LOGIC FUNCTIONS ---
+        // --- LOGIC FUNCTIONS (Made global for inline HTML use) ---
 
-        function toggleView(forceAdmin = null) {
+        window.toggleView = function(forceAdmin = null) {
             isViewAdmin = forceAdmin !== null ? forceAdmin : !isViewAdmin;
             ELEMENTS.toggleViewBtn.textContent = isViewAdmin ? 'Switch to Referee View' : 'Switch to Admin View';
             ELEMENTS.adminView.classList.toggle('hidden', !isViewAdmin);
             ELEMENTS.refereeView.classList.toggle('hidden', isViewAdmin);
-        }
+        };
 
         async function handleIngestFixtures() {
             const jsonText = ELEMENTS.mockDataArea.value.trim();
