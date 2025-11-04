@@ -18,7 +18,7 @@
             box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
             display: flex;
             flex-direction: column;
-            cursor: pointer; /* Makes all cards look clickable */
+            cursor: default; 
         }
         
         .fixture-main-content {
@@ -164,15 +164,9 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <p class="mt-3">Connecting to database...</p>
+                <p class="mt-3" id="loading-text">Connecting to database...</p>
             </div>
         </div>
-
-        <!-- Archived Fixtures (Hidden as per user focus, but good to keep logic) -->
-        <!-- <h2 class="text-2xl font-bold text-gray-700 border-b pb-2 mt-12 mb-4">Archived Schedules</h2>
-        <div id="archived-fixtures-list" class="space-y-3 text-gray-500">
-            <p class="text-center py-5" id="archived-empty-message">No past fixtures found.</p>
-        </div> -->
     </main>
     
     <!-- Admin Assignment Modal (Hidden) -->
@@ -202,20 +196,29 @@
 
     <!-- Firebase Imports and Script -->
     <script type="module">
-        // Global variables provided by the Canvas environment
+        // --- GLOBAL SETUP & CONFIG ACCESS ---
+        let rawFirebaseConfig = {};
+        try {
+            const configString = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+            rawFirebaseConfig = JSON.parse(configString);
+        } catch (e) {
+            console.error("CRITICAL ERROR: Failed to parse __firebase_config.", e);
+        }
+
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
-        // Configuration
+        // Configuration Constants
         const ADMIN_EMAIL = 'admin@betterfootball.co.nz';
         const ADMIN_PASSWORD = 'password';
         const ADMIN_NAME = 'BetterFootball Admin'; 
         const FIRES_COLLECTION_PATH = `/artifacts/${appId}/public/data/fixtures`;
+        const LOCAL_STORAGE_KEY = `referee-fixtures-${appId}`;
 
+        // Firebase Imports (using CDN links)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, doc, updateDoc, onSnapshot, getDoc, writeBatch, query, getDocs, setDoc, serverTimestamp, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, doc, updateDoc, onSnapshot, writeBatch, query, getDocs, serverTimestamp, arrayUnion, arrayRemove, setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         
         // Global State
         let app, db, auth;
@@ -224,7 +227,35 @@
         let userRole = 'none';
         let isDbReady = false; 
 
+        // Turn on debug logging for better troubleshooting
+        setLogLevel('Debug');
+
+
         // --- Utility Functions ---
+
+        /** Saves fixtures to local storage. Used when Firebase fails. */
+        function saveFixturesLocal(fixtures) {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(fixtures));
+                console.log(`Fixtures saved to local storage (${fixtures.length} items).`);
+            } catch (e) {
+                console.error("Failed to save to local storage:", e);
+                showStatus('danger', 'Local storage failed. Data will not persist across reloads.');
+            }
+        }
+
+        /** Loads fixtures from local storage. Used when Firebase fails. */
+        function loadFixturesLocal() {
+            try {
+                const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+                return data ? JSON.parse(data) : [];
+            } catch (e) {
+                console.error("Failed to load from local storage:", e);
+                return [];
+            }
+        }
+
+
         const dateFormatter = new Intl.DateTimeFormat('en-US', { 
             weekday: 'long', 
             year: 'numeric', 
@@ -235,18 +266,21 @@
         /** Shows a status message near the top center */
         function showStatus(type, message) {
             const statusDiv = document.getElementById('status-message');
+            if (!statusDiv) return;
+
             statusDiv.textContent = message;
             
             statusDiv.className = 'fixed top-4 left-1/2 -translate-x-1/2 p-3 rounded-xl shadow-xl z-50 transition-all duration-300 transform';
             statusDiv.classList.remove('hidden');
 
-            statusDiv.classList.remove('bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-yellow-100', 'text-yellow-800');
+            statusDiv.classList.remove('bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-yellow-100', 'text-yellow-800', 'border-green-500', 'border-red-500', 'border-yellow-500');
+            
             if (type === 'success') {
-                statusDiv.classList.add('bg-green-100', 'text-green-800');
+                statusDiv.classList.add('bg-green-100', 'text-green-800', 'border', 'border-green-500');
             } else if (type === 'danger') {
-                statusDiv.classList.add('bg-red-100', 'text-red-800');
+                statusDiv.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-500');
             } else if (type === 'warning') {
-                statusDiv.classList.add('bg-yellow-100', 'text-yellow-800');
+                statusDiv.classList.add('bg-yellow-100', 'text-yellow-800', 'border', 'border-yellow-500');
             }
             
             setTimeout(() => {
@@ -254,13 +288,14 @@
             }, 5000);
         }
 
-        /** Parses the user's plain text input into structured fixture objects. */
+        /** Parses the user's plain text input into structured fixture objects. (Logic confirmed working) */
         window.parseFixturesText = function(text) {
             const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
             const fixtures = [];
             
             const dateRegex = /(\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/i;
-            const timeRegex = /\d{1,2}:\d{2}\s*(AM|PM)/i;
+            const timeRegex = /\d{1,2}:\d{2}\s*(AM|PM|am|pm)/i;
+            
             const headers = ['venue', 'pitch', 'time', 'vs', 'vs:']; 
             const BYE_KEYWORD = 'bye'; 
 
@@ -313,11 +348,14 @@
                             if (currentFixture.home.toLowerCase().includes(BYE_KEYWORD) || currentFixture.away.toLowerCase().includes(BYE_KEYWORD)) {
                                 console.log(`Skipping fixture due to 'bye': ${currentFixture.home} vs ${currentFixture.away}`);
                             } else {
-                                // Add a sortable timestamp for consistent chronological grouping
                                 const dateObj = new Date(`${currentFixture.date} ${currentFixture.time}`);
                                 
+                                // Create a stable temporary ID for local storage
+                                const tempId = crypto.randomUUID(); 
+
                                 fixtures.push({
                                     ...currentFixture,
+                                    id: tempId, // Use this for local storage fixtures
                                     dateSortable: dateObj.getTime(),
                                     dateFormatted: dateFormatter.format(dateObj),
                                     assignedRef: null,
@@ -335,54 +373,71 @@
             return fixtures;
         };
 
-        // --- Identity Management (2. Minimise Forms on Success) ---
+        // --- Identity Management ---
         
         function updateUIBasedOnIdentity() {
+            // FIX: Cache all elements and check for null before operating (prevents TypeError)
             const display = document.getElementById('identity-display');
             const refForm = document.getElementById('identity-form');
             const adminForm = document.getElementById('admin-login-form');
             const greeting = document.getElementById('ref-greeting');
             const adminPanel = document.getElementById('admin-panel');
             const dbStatusMessage = document.getElementById('db-status-message');
-            
+            const loadingText = document.getElementById('loading-text');
+            const displayRefName = document.getElementById('display-ref-name');
+            const displayRole = document.getElementById('display-role');
+
             // Reset forms and display
-            refForm.classList.add('hidden');
-            adminForm.classList.add('hidden');
-            display.classList.add('hidden');
-            adminPanel.classList.add('hidden');
+            if (refForm) refForm.classList.add('hidden');
+            if (adminForm) adminForm.classList.add('hidden');
+            if (display) display.classList.add('hidden');
+            if (adminPanel) adminPanel.classList.add('hidden');
 
             if (userName) {
                 // Logged In: Show identity
-                display.classList.remove('hidden');
-                document.getElementById('display-ref-name').textContent = userName;
-                greeting.textContent = `Welcome, ${userName}. View and manage assignments below.`;
+                if (display) display.classList.remove('hidden');
+                if (displayRefName) displayRefName.textContent = userName;
+                if (greeting) greeting.textContent = `Welcome, ${userName}. View and manage assignments below.`;
 
                 if (userRole === 'admin') {
-                    document.getElementById('display-role').textContent = 'Administrator';
-                    document.getElementById('display-role').classList.add('text-red-600');
+                    if (displayRole) {
+                        displayRole.textContent = 'Administrator';
+                        displayRole.classList.add('text-red-600');
+                    }
                     
-                    // Admin: Show tool panel (minimized by default until used)
-                    adminPanel.classList.remove('hidden');
+                    // Admin: Show tool panel
+                    if (adminPanel) adminPanel.classList.remove('hidden');
 
-                    if (isDbReady) {
-                        dbStatusMessage.classList.add('hidden');
-                    } else {
-                        dbStatusMessage.classList.remove('hidden');
-                        if (!dbStatusMessage.innerHTML.includes('CRITICAL ERROR')) {
-                             dbStatusMessage.innerHTML = '🔴 **CRITICAL ERROR:** Database connection failed. Data will NOT be saved persistently.';
+                    if (dbStatusMessage) {
+                        if (isDbReady) {
+                            dbStatusMessage.classList.add('hidden');
+                        } else {
+                            dbStatusMessage.classList.remove('hidden');
+                            dbStatusMessage.innerHTML = '🔴 **CRITICAL ERROR:** Database connection failed (Permissions). Fixtures will be saved **ONLY in this browser** until you close the tab.';
                         }
                     }
 
                 } else {
-                    document.getElementById('display-role').textContent = 'Referee';
-                    document.getElementById('display-role').classList.remove('text-red-600');
+                    if (displayRole) {
+                        displayRole.textContent = 'Referee';
+                        displayRole.classList.remove('text-red-600');
+                    }
                 }
                 
             } else {
                 // Logged Out - Show default referee form
-                refForm.classList.remove('hidden');
-                greeting.textContent = 'Please log in to view the schedule.';
+                if (refForm) refForm.classList.remove('hidden');
+                if (greeting) greeting.textContent = 'Please log in to view the schedule.';
                 userRole = 'none';
+            }
+            
+            // Update loading status based on DB readiness
+            if (loadingText) {
+                if (!isDbReady) {
+                    loadingText.innerHTML = '⚠️ Using local storage. Data is **NOT** persistent or shared.';
+                } else if (!userName) {
+                    loadingText.textContent = 'Please log in to load the schedule.';
+                }
             }
         }
 
@@ -390,45 +445,70 @@
             const details = document.getElementById('admin-panel-details');
             const icon = document.getElementById('admin-toggle-icon');
             
-            if (details.classList.contains('hidden')) {
-                details.classList.remove('hidden');
-                icon.textContent = '−'; 
-            } else {
-                details.classList.add('hidden');
-                icon.textContent = '+';
+            if (details && icon) {
+                if (details.classList.contains('hidden')) {
+                    details.classList.remove('hidden');
+                    icon.textContent = '−'; 
+                } else {
+                    details.classList.add('hidden');
+                    icon.textContent = '+';
+                }
             }
         }
         
-        // Attach toggle function to the summary bar
-        document.getElementById('admin-panel-summary').onclick = window.toggleAdminPanel;
+        // Ensure the summary element exists before setting click handler
+        const adminPanelSummary = document.getElementById('admin-panel-summary');
+        if (adminPanelSummary) adminPanelSummary.onclick = window.toggleAdminPanel;
 
         window.showAdminLoginForm = function() {
-            document.getElementById('identity-form').classList.add('hidden');
-            document.getElementById('admin-login-form').classList.remove('hidden');
+            const refForm = document.getElementById('identity-form');
+            const adminForm = document.getElementById('admin-login-form');
+            if (refForm) refForm.classList.add('hidden');
+            if (adminForm) adminForm.classList.remove('hidden');
         }
 
         window.showRefereeLoginForm = function() {
-            document.getElementById('admin-login-form').classList.add('hidden');
-            document.getElementById('identity-form').classList.remove('hidden');
+            const refForm = document.getElementById('identity-form');
+            const adminForm = document.getElementById('admin-login-form');
+            if (adminForm) adminForm.classList.add('hidden');
+            if (refForm) refForm.classList.remove('hidden');
         }
 
         window.handleRefereeLogin = function() {
-            const inputName = document.getElementById('referee-name-input').value.trim();
+            const inputNameElement = document.getElementById('referee-name-input');
+            const inputName = inputNameElement ? inputNameElement.value.trim() : '';
+
             if (!inputName) {
                 return showStatus('danger', 'Please enter your full name.');
             }
-            // Use the full name as a simplified unique ID for the referee for this scenario
+            
             userId = inputName.toLowerCase().replace(/\s/g, '-'); 
             userName = inputName;
             userRole = 'referee';
-            updateUIBasedOnIdentity();
-            document.getElementById('referee-name-input').value = '';
-            showStatus('success', `Welcome ${userName}! You are logged in as a Referee.`);
+            
+            if(auth) {
+                // We still sign in anonymously to fulfill the security rules requirement
+                signInAnonymously(auth).then(() => {
+                    updateUIBasedOnIdentity();
+                    if (inputNameElement) inputNameElement.value = '';
+                    showStatus('success', `Welcome ${userName}! You are logged in as a Referee.`);
+                    setupDataListener(); // Refresh data listener after login
+                }).catch(e => {
+                    console.error("Anon sign in failed:", e);
+                    showStatus('danger', 'Failed to authenticate. Try again.');
+                });
+            } else {
+                 updateUIBasedOnIdentity();
+                 if (inputNameElement) inputNameElement.value = '';
+                 showStatus('warning', `Welcome ${userName}. Firebase is initializing. Try again in a moment.`);
+                 setupDataListener(); // Try to load local data immediately
+            }
+
         };
 
         window.handleAdminLogin = function() {
-            const email = document.getElementById('admin-email').value.trim();
-            const password = document.getElementById('admin-password').value.trim();
+            const email = document.getElementById('admin-email')?.value.trim();
+            const password = document.getElementById('admin-password')?.value.trim();
             
             if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
                 userId = 'ADMIN-USER-ID';
@@ -440,11 +520,16 @@
                 if (isDbReady) {
                     showStatus('success', 'Admin login successful. Database ready.');
                 } else {
-                    showStatus('danger', 'Admin login successful, but database connection failed. Fixture loading will only display locally.');
+                    showStatus('warning', 'Admin login successful. Database failed (Permissions). Using local storage fallback.');
                 }
+                
                 // Automatically open the data panel for the admin after login
-                document.getElementById('admin-panel-details').classList.remove('hidden');
-                document.getElementById('admin-toggle-icon').textContent = '−'; 
+                const details = document.getElementById('admin-panel-details');
+                const icon = document.getElementById('admin-toggle-icon');
+                if (details) details.classList.remove('hidden');
+                if (icon) icon.textContent = '−'; 
+                
+                setupDataListener(); // Refresh data listener after login
 
             } else {
                 showStatus('danger', 'Invalid admin credentials.');
@@ -455,155 +540,201 @@
             userId = null;
             userName = '';
             userRole = 'none';
+            // Sign out of firebase auth if possible
+            if (auth) auth.signOut();
             updateUIBasedOnIdentity();
             showStatus('warning', 'Logged out.');
+            setupDataListener(); // Re-render as logged out
         };
 
         // --- Core Firebase Setup ---
 
         async function initFirebase() {
-            const loadingIndicator = document.getElementById('loading-indicator');
-            const dbStatusMessage = document.getElementById('db-status-message');
+            const loadingText = document.getElementById('loading-text');
 
-            if (!Object.keys(firebaseConfig).length) {
-                console.error("Firebase config is missing. Cannot proceed with data ops.");
-                loadingIndicator.textContent = '❌ ERROR: Firebase configuration missing. Schedule data cannot be loaded or saved.';
-                dbStatusMessage.innerHTML = '🔴 **CRITICAL ERROR:** Firebase Config missing. Data will not be saved persistently.';
-                dbStatusMessage.classList.remove('hidden');
+            if (!Object.keys(rawFirebaseConfig).length || !rawFirebaseConfig.projectId) {
+                console.error("Firebase config is invalid or missing. Cannot proceed with data ops.");
+                if (loadingText) loadingText.innerHTML = '❌ ERROR: Firebase config is missing or invalid. Data cannot be loaded or saved.';
                 isDbReady = false;
                 updateUIBasedOnIdentity();
+                setupDataListener(); // Attempt local load
                 return;
             }
             
             try {
-                app = initializeApp(firebaseConfig);
+                console.log("Firebase Step 1: Initializing App...");
+                app = initializeApp(rawFirebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 isDbReady = true;
-                loadingIndicator.innerHTML = '<p class="mt-3">Awaiting Authentication...</p>';
-                dbStatusMessage.classList.add('hidden');
+                console.log("Firebase Step 2: App and services initialized successfully.");
+
+                if (loadingText) loadingText.textContent = 'Awaiting Authentication...';
                 
-                updateUIBasedOnIdentity();
-
+                // 3. Authenticate
+                let userLoggedIn = false;
                 if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
+                    console.log("Firebase Step 3a: Signing in with Custom Token...");
+                    const credential = await signInWithCustomToken(auth, initialAuthToken);
+                    userLoggedIn = true;
+                    console.log("Firebase Step 4: Authentication complete. User UID:", credential.user.uid);
                 } else {
+                    console.log("Firebase Step 3b: Signing in Anonymously...");
                     await signInAnonymously(auth);
+                    userLoggedIn = true;
                 }
-
+                
+                // 4. Set up Auth State Listener (Crucial for starting data ops)
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
+                        // Listener set up is handled here, but the data listener itself checks isDbReady
                         setupDataListener();
                     } else {
-                        loadingIndicator.textContent = 'Authentication failed. Please refresh.';
+                        console.log("Firebase Step 4: User logged out or auth failed.");
                     }
                 });
 
+                // Update UI after init success
+                updateUIBasedOnIdentity();
+
             } catch (error) {
                 console.error("Firebase initialization failed:", error);
-                showStatus('danger', `Setup Error: ${error.message}`);
-                loadingIndicator.textContent = `Setup Error: ${error.message}`;
-                
-                dbStatusMessage.innerHTML = `🔴 **CRITICAL ERROR:** Firebase Init Failed: ${error.message}. Data will not be saved.`;
-                dbStatusMessage.classList.remove('hidden');
-                isDbReady = false;
+                // Set isDbReady to false to trigger local storage fallback
+                isDbReady = false; 
+                showStatus('danger', `Setup Error (Falling back to local storage): ${error.message}`);
                 updateUIBasedOnIdentity();
+                setupDataListener(); // Attempt local load
             }
         }
 
-        // --- Data Loading and Parsing (Ensuring all fixtures are processed) ---
+        // --- Data Loading and Parsing (Refactored for Local Fallback) ---
 
         window.parseAndLoadFixtures = async function() {
             if (userRole !== 'admin') {
                 return showStatus('danger', 'Permission denied. Only Admin can load fixtures.');
             }
 
-            const pasteText = document.getElementById('fixtures-paste-area').value;
-            const fixturesToLoad = parseFixturesText(pasteText);
-
+            const pasteText = document.getElementById('fixtures-paste-area')?.value;
+            let fixturesToLoad = parseFixturesText(pasteText || '');
+            
             if (fixturesToLoad.length === 0) {
                 return showStatus('warning', 'Could not parse any fixtures. Check your paste format or ensure all fixtures have two teams (no "bye").');
             }
-
-            // --- LOCAL DISPLAY FALLBACK ---
-            if (!isDbReady || !db) {
-                showStatus('warning', `⚠️ Database not ready. Fixtures displayed locally (will NOT be saved). Please fix the Firebase Config issue for persistence.`);
-                document.getElementById('upcoming-fixtures-list').innerHTML = '';
-                // renderFixtures(fixturesToLoad); // Do not render locally if not saving
-                return;
-            }
-            // --- END LOCAL DISPLAY FALLBACK ---
-
-            // --- Database write logic ---
-            showStatus('warning', `Parsed ${fixturesToLoad.length} valid fixtures. Starting persistent database ingestion...`);
-            toggleAdminPanel(); // Minimize the input area after clicking Load
-
-            const fixturesCollection = collection(db, FIRES_COLLECTION_PATH);
-            const batch = writeBatch(db);
             
-            try {
-                // 1. Delete all existing fixtures to ensure only the new week is active
-                const snapshot = await getDocs(query(fixturesCollection));
-                snapshot.docs.forEach(docSnapshot => {
-                    batch.delete(docSnapshot.ref);
-                });
+            console.log(`Successfully parsed ${fixturesToLoad.length} fixtures from input.`);
+            const pasteArea = document.getElementById('fixtures-paste-area');
+            if (pasteArea) pasteArea.value = '';
 
-                // 2. Add new fixtures
-                fixturesToLoad.forEach(fixture => {
-                    const fixtureId = doc(fixturesCollection).id; 
-                    const newFixture = {
-                        ...fixture,
-                        matchId: fixtureId,
-                        assignedRef: null,
-                        volunteers: [], 
-                        status: 'open',
-                        dateSortable: fixture.dateSortable || Date.now(), // Ensure this exists
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp(),
-                    };
-                    batch.set(doc(fixturesCollection, fixtureId), newFixture);
-                });
+            toggleAdminPanel(); 
 
-                await batch.commit();
-                showStatus('success', `✅ Successfully loaded and activated ${fixturesToLoad.length} new fixtures. They are now live!`);
-                document.getElementById('fixtures-paste-area').value = '';
-            } catch (error) {
-                console.error("Data Load Failed:", error);
-                showStatus('danger', `Data Load Failed: ${error.message}`);
-            }
+            // --- DATABASE ATTEMPT (Primary) ---
+            if (isDbReady && db) {
+                showStatus('warning', `Parsed ${fixturesToLoad.length} valid fixtures. Attempting persistent database ingestion...`);
+
+                const fixturesCollection = collection(db, FIRES_COLLECTION_PATH);
+                const batch = writeBatch(db);
+                
+                try {
+                    // 1. Delete all existing fixtures 
+                    const snapshot = await getDocs(query(fixturesCollection));
+                    snapshot.docs.forEach(docSnapshot => {
+                        batch.delete(docSnapshot.ref);
+                    });
+
+                    // 2. Add new fixtures
+                    fixturesToLoad.forEach(fixture => {
+                        const fixtureRef = doc(fixturesCollection);
+                        
+                        // Use Firestore ID for persistence
+                        const newFixture = {
+                            ...fixture,
+                            id: fixtureRef.id, 
+                            createdAt: serverTimestamp(),
+                            updatedAt: serverTimestamp(),
+                        };
+                        batch.set(fixtureRef, newFixture);
+                    });
+
+                    await batch.commit();
+                    showStatus('success', `✅ Successfully loaded and activated ${fixturesToLoad.length} new fixtures. They are now live and shared!`);
+                    return; // EXIT successful database path
+
+                } catch (error) {
+                    console.error("Database Write Failed:", error);
+                    // Fall through to local storage if write fails (e.g., due to permissions)
+                    isDbReady = false; // Mark as failed for future checks
+                    showStatus('danger', `Data Save Failed: ${error.message}. Falling back to LOCAL STORAGE.`);
+                    updateUIBasedOnIdentity(); 
+                }
+            } 
+
+            // --- LOCAL STORAGE FALLBACK (Secondary) ---
+            console.log(`Fallback: Saving ${fixturesToLoad.length} fixtures to local storage.`);
+            saveFixturesLocal(fixturesToLoad);
+            
+            // Re-render the UI with the locally saved data
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator) loadingIndicator.classList.add('hidden'); 
+            renderFixtures(fixturesToLoad);
+            showStatus('warning', `⚠️ Fixtures loaded LOCALLY. Data is not persistent or shared across users/sessions.`);
         };
 
-        // --- Data Listener and UI Rendering (3. Grouping by Date Fix) ---
+        // --- Data Listener and UI Rendering (Refactored for Local Fallback) ---
         
         function setupDataListener() {
-            const fixturesRef = collection(db, FIRES_COLLECTION_PATH);
             const loadingIndicator = document.getElementById('loading-indicator');
-            
-            // Query ordered by dateSortable
-            const fixturesQuery = query(fixturesRef); // Removed explicit orderBy to avoid index requirement, sorting in memory is safer here.
+            if (loadingIndicator) loadingIndicator.classList.remove('hidden');
+
+            // --- LOCAL STORAGE PATH ---
+            if (!isDbReady || !db) {
+                const fixtures = loadFixturesLocal();
+                console.log(`Using Local Storage: Loaded ${fixtures.length} fixtures.`);
+                if (loadingIndicator) loadingIndicator.classList.add('hidden');
+                renderFixtures(fixtures);
+                if (fixtures.length === 0 && userName) {
+                    const loadingText = document.getElementById('loading-text');
+                    if (loadingText) loadingText.innerHTML = '⚠️ Schedule empty. Admin must load fixtures.';
+                }
+                return; // EXIT local storage path
+            }
+
+            // --- FIREBASE PATH ---
+            console.log("Firebase Step 5: Setting up live data listener...");
+            const fixturesRef = collection(db, FIRES_COLLECTION_PATH);
+            const fixturesQuery = query(fixturesRef); 
 
             onSnapshot(fixturesQuery, (snapshot) => {
-                loadingIndicator.classList.add('hidden'); 
+                console.log("Listener Update: Received data snapshot.");
+                if (loadingIndicator) loadingIndicator.classList.add('hidden'); 
                 
                 const allFixtures = [];
                 snapshot.forEach(doc => {
                     allFixtures.push({ id: doc.id, ...doc.data() });
                 });
                 
-                // Sort chronologically using the dateSortable timestamp in memory
+                // Sort chronologically in memory (to avoid index issues)
                 allFixtures.sort((a, b) => a.dateSortable - b.dateSortable);
 
                 renderFixtures(allFixtures);
             }, (error) => {
                 console.error("Firestore listen failed:", error);
-                showStatus('danger', 'Error fetching live schedule data.');
-                loadingIndicator.textContent = 'Error loading data.';
-                loadingIndicator.classList.remove('hidden');
+                
+                // Set isDbReady to false and trigger local fallback immediately
+                isDbReady = false;
+                setupDataListener(); 
+
+                const errorMessage = error.code === 'permission-denied' ? 
+                    '🔴 Permissions Error: Cannot read schedule from database. Using local storage.' : 
+                    'Error fetching live schedule data. Check console. Using local storage.';
+
+                showStatus('danger', errorMessage);
             });
         }
 
         function renderFixtures(allFixtures) {
             const upcomingList = document.getElementById('upcoming-fixtures-list');
+            if (!upcomingList) return; 
+            
             upcomingList.innerHTML = '';
             
             const now = new Date().getTime();
@@ -611,11 +742,14 @@
             let fixtureCount = 0;
 
             allFixtures.forEach(fixture => {
-                // Only render upcoming fixtures
+                if (!fixture.home || !fixture.away || !fixture.dateSortable || !fixture.dateFormatted) {
+                     return; 
+                }
+
                 if (fixture.dateSortable < now) return;
                 fixtureCount++;
                 
-                const dateHeaderKey = fixture.dateFormatted || fixture.date;
+                const dateHeaderKey = fixture.dateFormatted;
                 
                 // --- Date Grouping Logic ---
                 if (dateHeaderKey !== currentGroupedDate) {
@@ -655,8 +789,11 @@
                 
                 // 1. Admin View: Card is clickable to open modal
                 if (userRole === 'admin') {
-                    // Make all upcoming cards clickable for admin to manage
-                    card.setAttribute('onclick', `openAssignmentModal('${fixture.id}', '${fixture.home}', '${fixture.away}', '${dateHeaderKey}', '${fixture.time}', ${JSON.stringify(fixture.volunteers || [])}, '${fixture.assignedRef}')`);
+                    // Safely stringify volunteers array
+                    const volunteersJson = JSON.stringify(fixture.volunteers || []);
+
+                    card.classList.add('cursor-pointer'); 
+                    card.setAttribute('onclick', `openAssignmentModal('${fixture.id}', '${fixture.home.replace(/'/g, "\\'")}', '${fixture.away.replace(/'/g, "\\'")}', '${dateHeaderKey.replace(/'/g, "\\'")}', '${fixture.time.replace(/'/g, "\\'")}', '${volunteersJson.replace(/'/g, "\\'")}', '${fixture.assignedRef ? fixture.assignedRef.replace(/'/g, "\\'") : ''}')`);
 
                     if (fixture.status === 'open') {
                          actionHtml = `
@@ -675,27 +812,22 @@
                 } 
                 // 2. Referee View: Volunteer/Cancel button
                 else if (userName && userRole === 'referee') {
-                    // 4. Referee Volunteer Fix - Action based on status
                     if (fixture.status === 'assigned') {
                         actionHtml = `<div class="p-2 text-center text-sm text-green-600 font-bold">Assigned to: ${fixture.assignedRef}</div>`;
-                        card.removeAttribute('onclick'); // Not clickable
                     } else {
-                        // Open match: Volunteer/Cancel button
                         const actionClass = isVolunteer ? 'bg-red-500 hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700';
                         const actionText = isVolunteer ? 'Cancel Application' : 'Apply Now';
-                        const actionState = isVolunteer ? 'false' : 'true'; // True means volunteer, false means cancel
+                        const actionState = isVolunteer ? 'false' : 'true'; 
 
                         actionHtml = `
                             <button onclick="handleVolunteer(event, '${fixture.id}', ${actionState})" class="w-full h-full text-white p-2 font-semibold text-sm ${actionClass} transition duration-150">
                                 ${actionText}
                             </button>`;
-                        card.removeAttribute('onclick'); // Not clickable, button handles action
                     }
 
                 } else {
                     // Logged out
                     actionHtml = `<div class="p-2 text-center text-sm text-gray-500">${fixture.status === 'assigned' ? 'Assigned' : 'Login to Apply'}</div>`;
-                    card.removeAttribute('onclick');
                 }
                 
                 card.className = baseClasses;
@@ -737,10 +869,35 @@
             }
         }
 
-        // --- Admin Assignment Modal Logic (1. Admin Dropdown/Modal) ---
+        /** Helper to find and update a local fixture object */
+        function updateLocalFixture(matchId, updates) {
+            const fixtures = loadFixturesLocal();
+            const index = fixtures.findIndex(f => f.id === matchId);
+            
+            if (index !== -1) {
+                fixtures[index] = { ...fixtures[index], ...updates };
+                saveFixturesLocal(fixtures);
+                // Immediately update the UI to reflect the change
+                renderFixtures(fixtures.sort((a, b) => a.dateSortable - b.dateSortable));
+            }
+        }
 
-        window.openAssignmentModal = function(matchId, home, away, date, time, volunteers, assignedRef) {
+
+        // --- Admin Assignment Modal Logic (Retained) ---
+
+        window.openAssignmentModal = function(matchId, home, away, date, time, volunteersJson, assignedRef) {
             if (userRole !== 'admin') return;
+
+            // FIX: Volunteers must be parsed safely
+            let volunteers;
+            try {
+                // Replace escaped single quotes and then parse
+                volunteers = JSON.parse(volunteersJson.replace(/\\'/g, "'"));
+            } catch (e) {
+                console.error("Failed to parse volunteers JSON:", e);
+                volunteers = [];
+            }
+
 
             const modalBackdrop = document.getElementById('admin-assignment-modal-backdrop');
             const titleElement = document.getElementById('modal-match-title');
@@ -749,10 +906,15 @@
             const matchIdInput = document.getElementById('modal-match-id');
             const assignButton = document.getElementById('assign-button');
 
+            if (!modalBackdrop || !titleElement || !detailsElement || !listContainer || !matchIdInput || !assignButton) {
+                console.error("Modal elements not found. Cannot open modal.");
+                return;
+            }
+
             titleElement.textContent = `${home} vs ${away}`;
             detailsElement.textContent = `${date} at ${time}`;
             matchIdInput.value = matchId;
-            listContainer.innerHTML = ''; // Clear previous volunteers
+            listContainer.innerHTML = ''; 
 
             if (assignedRef) {
                  listContainer.innerHTML = `<p class="font-bold text-green-600">Currently Assigned: ${assignedRef}</p>`;
@@ -764,7 +926,9 @@
                 assignButton.textContent = 'No Volunteers';
             } else {
                 volunteers.forEach(name => {
-                    const radioId = `ref-${name.replace(/\s/g, '-')}`;
+                    // Sanitize name for use in IDs
+                    const safeName = name.replace(/[^a-z0-9]/gi, '_'); 
+                    const radioId = `ref-${safeName}`; 
                     listContainer.innerHTML += `
                         <label for="${radioId}" class="flex items-center p-2 bg-white rounded-lg cursor-pointer hover:bg-red-50 transition">
                             <input type="radio" id="${radioId}" name="selected_ref" value="${name}" class="text-red-600 focus:ring-red-500 h-4 w-4">
@@ -772,10 +936,9 @@
                         </label>
                     `;
                 });
-                assignButton.disabled = true; // Disabled until selection is made
+                assignButton.disabled = true; 
                 assignButton.textContent = 'Confirm Assignment';
                 
-                // Enable button when a radio is selected
                 document.querySelectorAll('input[name="selected_ref"]').forEach(radio => {
                     radio.addEventListener('change', () => {
                         assignButton.disabled = false;
@@ -789,97 +952,130 @@
 
         window.closeAssignmentModal = function() {
             const modalBackdrop = document.getElementById('admin-assignment-modal-backdrop');
+            if (!modalBackdrop) return;
+
             modalBackdrop.classList.remove('show');
             setTimeout(() => {
                 modalBackdrop.style.display = 'none';
-            }, 300); // Wait for transition
+            }, 300); 
         }
 
-
-        /** Admin finalizes assignment. */
         window.handleFinalAssignment = async function() {
             if (userRole !== 'admin') return showStatus('danger', 'Only administrators can make assignments.');
-            if (!db || !isDbReady) return showStatus('danger', 'Database connection not ready. Cannot save assignment status.');
 
-            const matchId = document.getElementById('modal-match-id').value;
+            const matchId = document.getElementById('modal-match-id')?.value;
             const selectedRefElement = document.querySelector('input[name="selected_ref"]:checked');
             
-            if (!selectedRefElement) {
-                return showStatus('warning', 'Please select a referee first.');
+            if (!selectedRefElement || !matchId) {
+                return showStatus('warning', 'Missing required information.');
             }
             const targetRefName = selectedRefElement.value;
 
-            const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
-            
-            try {
-                // Set assignedRef and status, ensuring the assigned ref is the only one in the volunteer list (for clean up)
-                await updateDoc(matchRef, {
-                    assignedRef: targetRefName,
-                    status: 'assigned',
-                    // Keep the volunteers list as is, it implicitly shows who was considered
-                    updatedAt: serverTimestamp()
-                });
-                closeAssignmentModal();
-                showStatus('success', `✅ ${targetRefName} ASSIGNED to match! Schedule updated.`);
-            } catch(e) {
-                console.error("Assignment failed:", e);
-                showStatus('danger', 'Failed to save assignment.');
+            // --- FIREBASE PATH ---
+            if (isDbReady && db) {
+                const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
+                try {
+                    await updateDoc(matchRef, {
+                        assignedRef: targetRefName,
+                        status: 'assigned',
+                        updatedAt: serverTimestamp()
+                    });
+                    closeAssignmentModal();
+                    return showStatus('success', `✅ ${targetRefName} ASSIGNED to match! Schedule updated.`);
+                } catch(e) {
+                    console.error("Assignment failed (Database):", e);
+                    // Fall through to local storage update on failure
+                    isDbReady = false;
+                    showStatus('danger', 'Database write failed. Falling back to local storage update.');
+                    updateUIBasedOnIdentity();
+                }
             }
+
+            // --- LOCAL STORAGE PATH ---
+            updateLocalFixture(matchId, {
+                assignedRef: targetRefName,
+                status: 'assigned',
+                updatedAt: new Date().getTime() // Use local timestamp for local updates
+            });
+            closeAssignmentModal();
+            showStatus('success', `✅ ${targetRefName} ASSIGNED locally.`);
         };
 
-        // --- Referee Action: Volunteer/Cancel (4. Volunteer Fix) ---
+        // --- Referee Action: Volunteer/Cancel (Refactored for Local Fallback) ---
         window.handleVolunteer = async function(event, matchId, isVolunteering) {
-            // Stop propagation so card click for admin logic is ignored
             event.stopPropagation(); 
             
             if (!userName || userRole !== 'referee') return showStatus('danger', 'Please log in as a Referee first.');
-            if (!db || !isDbReady) {
-                showStatus('warning', 'Database not ready. Your volunteer status cannot be saved persistently.');
-                return;
-            }
 
-            const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
-            
-            try {
-                if (isVolunteering) {
-                    // Add referee name to the volunteers array
+            // --- FIREBASE PATH ---
+            if (isDbReady && db) {
+                const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
+                try {
+                    const updateAction = isVolunteering ? arrayUnion(userName) : arrayRemove(userName);
                     await updateDoc(matchRef, { 
-                        volunteers: arrayUnion(userName),
+                        volunteers: updateAction,
                         updatedAt: serverTimestamp()
                     });
-                    showStatus('success', `✅ ${userName}, you have applied for this match!`);
-                } else {
-                    // Remove referee name from the volunteers array
-                    await updateDoc(matchRef, { 
-                        volunteers: arrayRemove(userName),
-                        updatedAt: serverTimestamp()
-                    });
-                    showStatus('warning', '❌ Application cancelled.');
+                    return showStatus('success', isVolunteering ? `✅ ${userName}, you have applied for this match!` : '❌ Application cancelled.');
+                } catch(e) {
+                    console.error("Volunteer update failed (Database):", e);
+                    // Fall through to local storage update on failure
+                    isDbReady = false;
+                    showStatus('danger', 'Database write failed. Falling back to local storage update.');
+                    updateUIBasedOnIdentity();
                 }
-
-            } catch(e) {
-                console.error("Volunteer update failed:", e);
-                showStatus('danger', 'Failed to update application status.');
+            }
+            
+            // --- LOCAL STORAGE PATH ---
+            const fixtures = loadFixturesLocal();
+            const fixture = fixtures.find(f => f.id === matchId);
+            
+            if (fixture) {
+                const currentVolunteers = fixture.volunteers || [];
+                if (isVolunteering) {
+                    if (!currentVolunteers.includes(userName)) {
+                        currentVolunteers.push(userName);
+                        updateLocalFixture(matchId, { volunteers: currentVolunteers });
+                        showStatus('success', `✅ ${userName}, you have applied for this match locally.`);
+                    }
+                } else {
+                    const updatedVolunteers = currentVolunteers.filter(name => name !== userName);
+                    updateLocalFixture(matchId, { volunteers: updatedVolunteers });
+                    showStatus('warning', '❌ Application cancelled locally.');
+                }
             }
         };
 
-        /** Admin clears a final assignment. */
+        /** Admin clears a final assignment. (Refactored for Local Fallback) */
         window.handleUnassign = async function(matchId) {
              if (userRole !== 'admin') return showStatus('danger', 'Only administrators can unassign.');
-             if (!db || !isDbReady) return showStatus('danger', 'Database connection not ready. Cannot clear assignment.');
             
-             const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
-             try {
-                 await updateDoc(matchRef, {
-                    assignedRef: null,
-                    status: 'open',
-                    updatedAt: serverTimestamp()
-                 });
-                 showStatus('warning', 'Assignment cleared. Match is now open for volunteering.');
-             } catch(e) {
-                 console.error("Unassign failed:", e);
-                 showStatus('danger', 'Failed to clear assignment.');
+             // --- FIREBASE PATH ---
+             if (isDbReady && db) {
+                 const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
+                 try {
+                     await updateDoc(matchRef, {
+                        assignedRef: null,
+                        status: 'open',
+                        updatedAt: serverTimestamp()
+                     });
+                     return showStatus('warning', 'Assignment cleared. Match is now open for volunteering.');
+                 } catch(e) {
+                     console.error("Unassign failed (Database):", e);
+                     // Fall through to local storage update on failure
+                     isDbReady = false;
+                     showStatus('danger', 'Database write failed. Falling back to local storage update.');
+                     updateUIBasedOnIdentity();
+                 }
              }
+
+             // --- LOCAL STORAGE PATH ---
+             updateLocalFixture(matchId, {
+                assignedRef: null,
+                status: 'open',
+                updatedAt: new Date().getTime()
+             });
+             showStatus('warning', 'Assignment cleared locally.');
         }
 
         /** Master function to start the app logic. */
