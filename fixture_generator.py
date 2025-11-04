@@ -1,175 +1,168 @@
 import requests
 from bs4 import BeautifulSoup
 import json
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 
 # --- Configuration ---
-FIXTURE_URL = "https://www.betterfootball.co.nz/fixtures-and-standings/"
-WEEKDAY_MAP = {
-    'Sat': 5, # Target Sat (start of week)
-    'Sun': 6,
-    'Mon': 0,
-    'Tue': 1,
-    'Wed': 2,
-    'Thu': 3  # Target Thu (end of week)
+# You can add or remove URLs here. These are the two primary ones for 11-a-side fixtures.
+TARGET_URLS = [
+    "https://www.betterfootball.co.nz/fixtures-and-standings/saturday-11s-mens-fixtures-202526/", 
+    "https://www.betterfootball.co.nz/fixtures-and-standings/sunday-league-11s-202526-fixtures/" 
+]
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 }
+MONTH_MAP = { "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12 }
 
-def calculate_target_week():
-    """Calculates the date range: Saturday of the current week to the following Thursday."""
-    today = date.today()
+def calculate_date_range():
+    """Calculates the target date range: current Saturday to next Thursday."""
+    today = datetime.now().date()
     
-    # Calculate the date of the previous Saturday (or today if it's Saturday)
-    # 0=Monday, 6=Sunday in Python's weekday(). We want to start on Saturday (weekday 5)
+    # Python weekday(): 0=Monday, 5=Saturday, 6=Sunday
+    days_until_saturday = (5 - today.weekday() + 7) % 7
     
-    # Calculate days back to the most recent Saturday (weekday 5)
-    days_to_saturday = (today.weekday() - 5 + 7) % 7
-    start_date = today - timedelta(days=days_to_saturday)
-    
-    # The end date is the Thursday following the start date (5 days after Saturday)
-    end_date = start_date + timedelta(days=5)
+    if today.weekday() == 5: # If today is Saturday, start today
+        start_date = today
+    else:
+        # Otherwise, calculate the upcoming Saturday
+        start_date = today + timedelta(days=days_until_saturday)
+        
+    # The end date is the Thursday after the calculated Saturday
+    end_date = start_date + timedelta(days=5) # Saturday + 5 days = Thursday
 
+    print(f"Targeting fixtures from {start_date.isoformat()} (Saturday) to {end_date.isoformat()} (Thursday).")
     return start_date, end_date
 
-def get_fixtures():
-    """Simulates scraping the website and filtering fixtures based on rules."""
-    
+def convert_12hr_to_24hr(time_str):
+    """Converts 'HH:MM AM/PM' to 'HH:MM' (24-hour format)."""
     try:
-        print(f"Fetching data from: {FIXTURE_URL}")
-        response = requests.get(FIXTURE_URL, timeout=15)
-        response.raise_for_status() # Raise exception for bad status codes
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching page: {e}")
-        return [], []
+        if 'AM' in time_str.upper() or 'PM' in time_str.upper():
+            dt_object = datetime.strptime(time_str, '%I:%M %p')
+        else:
+            # Assume 24-hour format if no AM/PM indicator is present
+            dt_object = datetime.strptime(time_str, '%H:%M')
+        return dt_object.strftime('%H:%M')
+    except ValueError:
+        return None
 
-    soup = BeautifulSoup(response.content, 'html.parser')
-    
-    # NOTE: Scraping the Better Football site is highly dependent on its internal HTML structure. 
-    # This selector is a common pattern but may need adjustment if their site changes.
-    # We are looking for the common table structure used for fixtures.
-    fixture_tables = soup.find_all('table', class_=['fixture-table', 'results-table']) 
-    
-    if not fixture_tables:
-        print("Warning: No fixture tables found on the page. The scraper may need updating.")
-        return [], []
-
-    # Get the target date range for filtering
-    start_date, end_date = calculate_target_week()
-    print(f"Filtering fixtures between {start_date} (Saturday) and {end_date} (Thursday).")
-    
-    clean_fixtures = []
-    notes_5s_7s = []
-    
-    # Iterate through all tables found (assuming each row is a fixture)
-    for table in fixture_tables:
-        rows = table.find_all('tr')
+def format_date_to_iso(date_str_raw):
+    """Converts 'DD Mon YYYY' to 'YYYY-MM-DD'."""
+    date_header_match = date_str_raw.match(r'(\d{1,2})\s+([a-zA-Z]{3})\s+(\d{4})')
+    if not date_header_match:
+        return None, None
         
-        # Determine column indices dynamically, or assume a fixed order based on known table structure
-        # Assuming the first row is a header, and columns are (Date, Time, Home, Away, Pitch, League/Competition)
-        for row in rows[1:]: # Skip header row
-            cols = row.find_all(['td', 'th'])
-            if len(cols) < 6:
-                continue # Skip incomplete rows
-
-            # Extract basic data (must handle potential missing data)
-            date_str = cols[0].get_text(strip=True)
-            time_str = cols[1].get_text(strip=True)
-            home_team = cols[2].get_text(strip=True)
-            away_team = cols[3].get_text(strip=True)
-            pitch = cols[4].get_text(strip=True)
-            league = cols[5].get_text(strip=True)
+    day = int(date_header_match.group(1))
+    month_str = date_header_match.group(2).lower()
+    year = int(date_header_match.group(3))
+    
+    month_index = MONTH_MAP.get(month_str)
+    
+    if month_index:
+        try:
+            fixture_date_obj = datetime(year, month_index, day).date()
+            return fixture_date_obj, fixture_date_obj.isoformat()
+        except ValueError:
+            return None, None
             
-            # --- Date Validation and Filtering ---
-            try:
-                # The date string is typically 'Day DD/MM/YYYY' (e.g., 'Sat 08/11/2025')
-                # Since the year is not explicitly available on the website, we assume current year 
-                # or try to infer from the context of the page's date logic. 
-                # For this script, we assume the date string is simple, e.g. "Sat 14:00" and rely on calculated dates.
-                
-                # We can't reliably parse the website's date format without seeing the live structure. 
-                # For safety, we will simulate the parsing by assuming the date is provided in 'DD/MM/YYYY' format 
-                # and combining it with the current year if needed.
-                
-                # Since we cannot safely parse the dynamic table structure here, 
-                # we will **SIMULATE** the data pull and focus on the filtering logic.
-                
-                # **REAL WORLD ACTION REQUIRED: Manually check the date against start_date and end_date**
-                # Since we can't fully parse the site's date structure, this is where a human takes over for accuracy.
-                
-                # --- Simulated Date Check (Requires user confirmation) ---
-                # For the purpose of running the Python script, let's use a dummy date for filtering tests
-                fixture_date_for_testing = start_date + timedelta(days=2) # e.g., Monday
-                is_within_range = start_date <= fixture_date_for_testing <= end_date
+    return None, None
 
-            except Exception:
-                # print(f"Could not parse date for fixture: {home_team} vs {away_team}")
-                is_within_range = False # Assume out of range if parsing fails
-                
-            # --- Special Rule Filtering (5's, 7's) ---
-            fixture_description = f"{home_team} vs {away_team} ({league})"
-            is_small_sided = "5's" in fixture_description or "7's" in fixture_description
-            
-            if is_small_sided:
-                notes_5s_7s.append(fixture_description)
-                continue # Skip this fixture for referee assignment
-                
-            # --- Add to Clean Fixtures (If within range) ---
-            # NOTE: We use the mock date structure to ensure the output JSON is correct
-            # In a real script, you'd use the parsed date values here.
-            
-            # We'll use the current logic's output for the mock file to ensure integrity
-            # and just assume all scraped items are for the upcoming week for demonstration.
-            
-            # Since we cannot run the actual scrape, we will ONLY process the filter logic 
-            # and format the output based on *mock data*, ensuring the Python output is ready for the HTML input.
-            
-            if not is_small_sided:
-                # This uses the mock structure for demonstration
-                clean_fixtures.append({
-                    "date": "YYYY-MM-DD", # Placeholder: Must be replaced with actual parsed date
-                    "time": time_str, 
-                    "home": home_team, 
-                    "away": away_team, 
-                    "pitch": pitch, 
-                    "league": league
-                })
+def scrape_fixtures(start_date, end_date):
+    """Fetches, parses, and filters fixtures from the target URLs."""
+    all_fixtures = []
+    
+    for url in TARGET_URLS:
+        print(f"\n--- Processing URL: {url} ---")
+        league_from_url = "Saturday 11s" if "saturday" in url else ("Sunday 11s" if "sunday" in url else "Unknown 11s")
 
+        try:
+            response = requests.get(url, headers=HEADERS)
+            response.raise_for_status() 
+            soup = BeautifulSoup(response.content, 'html.parser')
 
-    # Since the live scrape cannot be run here, we provide the clean MOCK data 
-    # structure to demonstrate the *final* output format required by the HTML app.
-    # The user must adapt the scraping part.
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching {url}: {e}")
+            continue
 
-    if not clean_fixtures:
-        # Re-using the known good mock data structure for a guaranteed runnable output
-        clean_fixtures = [
-            { "date": str(start_date + timedelta(days=0)), "time": "14:00", "home": "Ballers FC", "away": "Dynamo Kev FC", "pitch": "S1", "league": "Mens Prem 11s" },
-            { "date": str(start_date + timedelta(days=0)), "time": "15:30", "home": "Far Canal", "away": "Wellington Right Wingers", "pitch": "S1", "league": "St Pats 11s" },
-            { "date": str(start_date + timedelta(days=3)), "time": "19:00", "home": "VUWAFC", "away": "Wanderers", "pitch": "T1", "league": "Uni Cup 11s" }
-        ]
+        # Initialize stateful date tracker
+        current_date_iso = None
         
-    if not notes_5s_7s:
-         notes_5s_7s = [
-            "Boyd Wilson Wednesday Night 7's", 
-            "Karori 5's Monday", 
-            "The filter logic is working, but this data is mocked."
-        ]
+        # Look for table elements, as the fixtures are contained within them.
+        tables = soup.select('table') 
+
+        for table in tables:
+            rows = table.find_all('tr')
+
+            for row in rows:
+                cols = row.find_all(['td', 'th'])
+                if not cols:
+                    continue
+
+                first_col_text = cols[0].get_text(strip=True)
+
+                # 1. Check for Date Header Row (e.g., "04 Nov 2025")
+                date_header_match = datetime.strptime
+                try:
+                    # Attempt to parse as a date header
+                    dt_obj = datetime.strptime(first_col_text, '%d %b %Y')
+                    current_date_obj = dt_obj.date()
+                    current_date_iso = current_date_obj.isoformat()
+                    print(f"Found Date Header: {current_date_iso}")
+                    continue
+                except ValueError:
+                    # Not a date header, continue to fixture check
+                    pass 
+                
+                # 2. Check for Fixture Row (Structure: Home, vs, Away, Venue, Pitch, Time)
+                if current_date_iso and len(cols) >= 6:
+                    home_team = cols[0].get_text(strip=True)
+                    away_team = cols[2].get_text(strip=True) 
+                    venue = cols[3].get_text(strip=True)
+                    pitch = cols[4].get_text(strip=True)
+                    time_str_raw = cols[5].get_text(strip=True)
+
+                    # Basic validation and filter
+                    if not home_team or not away_team or not time_str_raw:
+                        continue
+                    
+                    if home_team.lower() == 'bye' or away_team.lower() == 'bye':
+                         # print(f"Skipping 'Bye' fixture: {home_team} vs {away_team}")
+                         continue
+                         
+                    # --- Time Conversion (12hr to 24hr) ---
+                    time_24hr = convert_12hr_to_24hr(time_str_raw)
+
+                    # --- Date Range Filtering ---
+                    if start_date <= current_date_obj <= end_date and time_24hr:
+                        
+                        all_fixtures.append({
+                            "date": current_date_iso, 
+                            "time": time_24hr, 
+                            "home": home_team, 
+                            "away": away_team, 
+                            "pitch": venue, # Venue is the location name (St Pats, Boyd Wilson)
+                            "league": league_from_url 
+                        })
+                    # else:
+                        # print(f"Skipping fixture outside range/invalid time: {home_team} vs {away_team} on {current_date_iso} at {time_str_raw}")
 
 
-    return clean_fixtures, notes_5s_7s
+    print(f"\n✅ Total fixtures found within the target range: {len(all_fixtures)}")
+    return all_fixtures
 
+def save_fixtures_to_json(fixtures):
+    """Saves the extracted fixtures list to a JSON file."""
+    try:
+        with open('fixtures.json', 'w', encoding='utf-8') as f:
+            json.dump(fixtures, f, indent=4, ensure_ascii=False)
+        print("Successfully wrote fixtures to fixtures.json")
+    except Exception as e:
+        print(f"Error saving file: {e}")
 
-if __name__ == "__main__":
-    fixtures_for_ingestion, special_notes = get_fixtures()
+if __name__ == '__main__':
+    start_date, end_date = calculate_date_range()
     
-    # --- Output JSON for Ingestion ---
-    print("\n" + "="*50)
-    print("📋 FIXTURES READY FOR INGESTION (COPY/PASTE INTO WEB APP)")
-    print("="*50)
-    print(json.dumps(fixtures_for_ingestion, indent=4))
+    # Execute the scraping function
+    weekly_fixtures = scrape_fixtures(start_date, end_date)
     
-    # --- Output Special Notes ---
-    print("\n" + "="*50)
-    print("📝 SPECIAL 5's / 7's FIXTURES (For Manual Referee Sign-up Notes)")
-    print("="*50)
-    for note in special_notes:
-        print(f"- {note}")
-    print("\nNOTE: You can now copy the JSON data above and paste it into the 'Admin: Fixture Ingestion' box in the web application.")
+    # Save the results (This is the file the GitHub Action commits)
+    save_fixtures_to_json(weekly_fixtures)
