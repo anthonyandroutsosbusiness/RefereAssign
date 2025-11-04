@@ -83,9 +83,9 @@
                 <p id="admin-status" class="text-center text-lg font-bold text-green-600">Admin Tools Activated</p>
                 
                 <section class="bg-white p-6 card">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Admin: Fixture Ingestion</h2>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Admin: Fixture Ingestion (Paste Here)</h2>
                     <p class="text-sm text-gray-600 mb-3">
-                        Paste the JSON array of fixtures here. This data comes from your Tuesday automation script.
+                        Paste the JSON array of fixtures here (or use the Python script below to generate it).
                         <button onclick="window.loadMockData()" class="text-indigo-500 hover:text-indigo-700 font-medium">Load Mock Data</button>
                     </p>
                     <textarea id="mock-data-area" rows="6" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder='[{"matchId": "123", "date": "2025-11-08", "time": "14:00", "home": "Team A", "away": "Team B", "pitch": "Main Field", "league": "Mens Prem"}, ...]'></textarea>
@@ -228,7 +228,7 @@
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                setLogLevel('error'); // Use 'error' to keep console clean
+                setLogLevel('error'); 
 
                 // Initialize custom name input and listener
                 ELEMENTS.refNameInput.value = customRefName;
@@ -287,18 +287,14 @@
         };
         
         function setupUI() {
-            // Attach ingestion function globally for HTML onclick
             window.handleIngestFixtures = handleIngestFixtures;
+            window.loadMockData = loadMockData; 
             
-            // Set initial view state based on admin status
             updateAdminViewVisibility(isAdminLoggedIn);
-            
-            // Ensure initial view matches the default state
             window.toggleView(true); 
         }
 
-        // FIX: Define a global function (attached to window) so the HTML button's onclick can access it.
-        window.loadMockData = function() {
+        function loadMockData() {
             ELEMENTS.mockDataArea.value = MOCK_FIXTURES;
             ELEMENTS.mockDataArea.dispatchEvent(new Event('input')); // Re-check validity and enable button
         };
@@ -315,7 +311,6 @@
                 ELEMENTS.adminLoginMessage.textContent = 'Login successful!';
                 ELEMENTS.adminLoginMessage.classList.remove('text-red-500');
                 ELEMENTS.adminLoginMessage.classList.add('text-green-600');
-                // Auto-switch to Admin view after login
                 window.toggleView(true); 
 
             } else {
@@ -334,6 +329,7 @@
         // --- FIREBASE LISTENERS & DATA ACCESS ---
 
         function getCollectionPath() {
+            // Public collection path for shared fixtures data
             return `artifacts/${appId}/public/data/weekly_fixtures`;
         }
 
@@ -345,7 +341,6 @@
                 const fixtures = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
-                    // Ensure date/time strings are present
                     if (!data.date || !data.time) return; 
 
                     fixtures.push({ id: doc.id, ...data });
@@ -383,24 +378,17 @@
             ELEMENTS.ingestMessage.classList.remove('text-red-600');
             ELEMENTS.ingestMessage.classList.add('text-green-600');
             
-            // 2. Pre-flight Checks
-            const jsonText = ELEMENTS.mockDataArea.value.trim();
-            if (!jsonText) {
-                ELEMENTS.ingestMessage.textContent = 'Error: Fixture data area is empty. Please load mock data or paste JSON.';
-                ELEMENTS.ingestMessage.classList.remove('text-green-600');
-                ELEMENTS.ingestMessage.classList.add('text-red-600');
-                // The finally block will reset the button state
-                return; 
-            }
-            if (!isAdminLoggedIn) {
-                ELEMENTS.ingestMessage.textContent = 'Error: Admin login required to ingest fixtures. Please click "Login as Admin" first.';
-                ELEMENTS.ingestMessage.classList.remove('text-green-600');
-                ELEMENTS.ingestMessage.classList.add('text-red-600');
-                // The finally block will reset the button state
-                return;
-            }
-
             try {
+                // 2. Pre-flight Checks
+                const jsonText = ELEMENTS.mockDataArea.value.trim();
+                if (!jsonText) {
+                    throw new Error("Fixture data area is empty. Please load mock data or paste JSON.");
+                }
+                if (!isAdminLoggedIn) {
+                    throw new Error("Admin login required to ingest fixtures. Please log in first.");
+                }
+
+                // 3. Parsing and Validation
                 const newFixtures = JSON.parse(jsonText);
                 if (!Array.isArray(newFixtures)) throw new Error("Input must be a JSON array.");
                 
@@ -408,6 +396,7 @@
                 const fixtureCollection = collection(db, getCollectionPath());
                 let ingestedCount = 0;
 
+                // 4. Batch Write Operation
                 for (const fixture of newFixtures) {
                     // Create a deterministic ID based on key fixture details
                     const idParts = [fixture.date, fixture.time, fixture.home, fixture.away];
@@ -431,12 +420,12 @@
                     };
 
                     batch.set(fixtureRef, dataToSet, { merge: true }); 
-
                     ingestedCount++;
                 }
 
                 await batch.commit();
 
+                // 5. Success
                 ELEMENTS.ingestMessage.textContent = `✅ Success: Successfully ingested and updated ${ingestedCount} fixtures.`;
                 ELEMENTS.mockDataArea.value = ''; 
 
@@ -444,23 +433,23 @@
                 console.error("Ingestion Error:", error);
                 
                 let errorMessage = `Error during ingestion: ${error.message}`;
-                // Specific check for Firebase permission errors (most likely cause of failure)
                 if (error.code && error.code.includes('permission-denied')) {
-                     errorMessage = "FIREBASE ERROR: Permission Denied. Are you fully signed in as Admin?";
+                     errorMessage = "FIREBASE ERROR: Permission Denied. Check your security rules/auth state.";
                 }
                 
-                ELEMENTS.ingestMessage.textContent = `❌ ${errorMessage}`;
+                // 6. Failure
+                ELEMENTS.ingestMessage.textContent = `❌ INGESTION FAILED: ${errorMessage}`;
                 ELEMENTS.ingestMessage.classList.remove('text-green-600');
                 ELEMENTS.ingestMessage.classList.add('text-red-600');
             } finally {
-                 // 3. Reset Button State
+                 // 7. Always Reset Button State
                 ELEMENTS.ingestBtn.disabled = false;
                 ELEMENTS.ingestBtn.textContent = '1. Ingest/Update Weekly Fixtures';
             }
         }
 
         // Made global by renderAdminView
-        async function handleApprove(fixtureId, refId, refName) {
+        window.handleApprove = async function(fixtureId, refId, refName) {
             if (!isAdminLoggedIn) return; // Security check
 
             const fixtureRef = doc(db, getCollectionPath(), fixtureId);
@@ -480,7 +469,7 @@
         }
         
         // Made global by renderAdminView
-        async function handleUnassign(fixtureId) {
+        window.handleUnassign = async function(fixtureId) {
             if (!isAdminLoggedIn) return; // Security check
 
             const fixtureRef = doc(db, getCollectionPath(), fixtureId);
@@ -493,10 +482,9 @@
         }
 
         // Made global by renderRefereeView
-        async function handleVolunteer(fixtureId) {
+        window.handleVolunteer = async function(fixtureId) {
             const name = ELEMENTS.refNameInput.value.trim();
             if (!name) {
-                // Should use a modal, but for now, console log and focus input
                 console.error("Please enter your referee name before volunteering.");
                 ELEMENTS.refNameInput.focus();
                 return;
@@ -542,22 +530,17 @@
         }
 
         // --- RENDER FUNCTIONS ---
-
         function checkRefNameAndRenderButtons() {
-             // Updates button states and input field look dynamically
              const namePresent = ELEMENTS.refNameInput.value.trim().length > 0;
              const isVolunteeringAllowed = isVolunteerPhase();
 
-             // Update ref input styling
              if (!isVolunteeringAllowed) {
                  ELEMENTS.refNameInput.classList.add('cursor-not-allowed', 'bg-gray-100');
              } else {
                  ELEMENTS.refNameInput.classList.remove('cursor-not-allowed', 'bg-gray-100');
              }
              
-             // Update all buttons in the referee list if a full fixture render hasn't occurred yet
              document.querySelectorAll('#referee-fixture-list button').forEach(button => {
-                 // Only update 'Volunteer' buttons that aren't already set to 'Volunteered' or 'Locked'
                  if (button.textContent.includes('Volunteer')) {
                      const isCandidateButton = button.textContent === 'Volunteered';
                      if (!isCandidateButton) {
@@ -571,12 +554,7 @@
              });
         }
 
-
         function renderAdminView(fixtures) {
-            // Re-attach global functions after every render update
-            window.handleApprove = handleApprove;
-            window.handleUnassign = handleUnassign;
-            
             const isAdminPhase = !isVolunteerPhase();
             
             ELEMENTS.adminPhaseMessage.textContent = isAdminPhase
@@ -598,7 +576,7 @@
                 const isAssigned = !!assigned;
 
                 const candidateListHTML = candidates
-                    .sort((a, b) => b.volunteeredAt.toMillis() - a.volunteeredAt.toMillis()) // Sort by most recent volunteer first
+                    .sort((a, b) => b.volunteeredAt.toMillis() - a.volunteeredAt.toMillis()) 
                     .map(candidate => `
                     <div class="flex justify-between items-center bg-gray-100 p-2 rounded-lg my-1">
                         <span class="font-semibold text-gray-700">${candidate.name}</span>
@@ -649,9 +627,6 @@
         }
 
         function renderRefereeView(fixtures) {
-            // Re-attach global functions after every render update
-            window.handleVolunteer = handleVolunteer;
-            
             const isVolunteeringAllowed = isVolunteerPhase();
             const namePresent = ELEMENTS.refNameInput.value.trim().length > 0;
 
@@ -659,7 +634,6 @@
                 ? `You are in the <span class="text-green-600">Volunteer Phase.</span> Enter your name and click "Volunteer".`
                 : `<span class="text-red-600">Approval Phase Locked:</span> Final assignments are now being made by the Admin.`;
 
-            // Disable name input if the phase is locked
             ELEMENTS.refNameInput.disabled = !isVolunteeringAllowed;
             ELEMENTS.refNameInput.placeholder = isVolunteeringAllowed ? "e.g., Jane D. or JD Ref" : "Volunteering is locked";
 
