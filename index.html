@@ -72,7 +72,8 @@
                 Process and Load Fixtures
             </button>
             <p id="db-status-message" class="text-xs font-semibold text-red-700 mt-2 hidden">
-                <span class="animate-pulse">Database connection failed. Check config and permissions.</span>
+                <!-- Initial content will be set by initFirebase or on Admin login -->
+                <span class="animate-pulse">Attempting to connect to database...</span>
             </p>
         </div>
     </div>
@@ -253,14 +254,18 @@
                     document.getElementById('display-role').textContent = 'Administrator';
                     document.getElementById('display-role').classList.add('text-red-600');
                     
-                    // Show admin panel immediately upon successful admin login
+                    // Show admin panel immediately, regardless of isDbReady
                     adminPanel.classList.remove('hidden');
 
-                    // Show DB status if not ready
-                    if (!isDbReady) {
-                        dbStatusMessage.classList.remove('hidden');
-                    } else {
+                    // Update DB status message based on readiness
+                    if (isDbReady) {
                         dbStatusMessage.classList.add('hidden');
+                    } else {
+                        // The error message is handled in initFirebase, just ensure it's visible if bad.
+                        dbStatusMessage.classList.remove('hidden');
+                        if (!dbStatusMessage.innerHTML.includes('CRITICAL ERROR')) {
+                             dbStatusMessage.innerHTML = '<span class="animate-pulse">Waiting for Database connection...</span>';
+                        }
                     }
 
                 } else {
@@ -273,7 +278,7 @@
                 refForm.classList.remove('hidden');
                 greeting.textContent = 'Please log in to view the schedule.';
                 userRole = 'none';
-                dbStatusMessage.classList.add('hidden');
+                // dbStatusMessage state is managed by initFirebase
             }
         }
         
@@ -307,13 +312,15 @@
                 userId = 'ADMIN-USER-ID'; // Use a fixed identifier for Firestore
                 userName = ADMIN_NAME;
                 userRole = 'admin';
-                // Call updateUI to show the panel right away, even if DB is still connecting or failed
+                
+                // CRITICAL FIX: Show the UI regardless of DB state
                 updateUIBasedOnIdentity(); 
                 
                 if (isDbReady) {
                     showStatus('success', 'Admin login successful. Database ready.');
                 } else {
-                    showStatus('warning', 'Admin login successful. Waiting for database connection.');
+                    // Show a specific warning if the DB failed init, but the UI is now visible
+                    showStatus('danger', 'Admin login successful, but database connection failed. Fixture loading is disabled.');
                 }
             } else {
                 showStatus('danger', 'Invalid admin credentials.');
@@ -334,11 +341,13 @@
             const dbStatusMessage = document.getElementById('db-status-message');
 
             if (!Object.keys(firebaseConfig).length) {
-                console.error("Firebase config is missing. Displaying fallback message.");
-                loadingIndicator.textContent = 'ERROR: Firebase config missing. Cannot connect to database.';
+                console.error("Firebase config is missing. Cannot proceed with data ops.");
+                loadingIndicator.textContent = '❌ ERROR: Firebase configuration missing. Schedule data cannot be loaded or saved.';
+                dbStatusMessage.innerHTML = '🔴 **CRITICAL ERROR:** Firebase Config missing. Data will not be saved persistently.';
+                dbStatusMessage.classList.remove('hidden');
                 isDbReady = false; // Ensure flag is false
-                dbStatusMessage.classList.remove('hidden'); // Show error in admin panel if visible
-                return;
+                updateUIBasedOnIdentity(); // Update admin panel immediately if admin is logged in
+                return; // Exit early if config is missing
             }
             
             try {
@@ -348,6 +357,9 @@
                 isDbReady = true; // DB instance is available
                 loadingIndicator.innerHTML = '<p class="mt-3">Awaiting Authentication...</p>';
                 dbStatusMessage.classList.add('hidden'); // Hide status message if successful
+                
+                // Re-update the UI to hide the status message if admin logged in before init completed
+                updateUIBasedOnIdentity();
 
                 // Sign in anonymously to get a base UID and establish a connection
                 if (initialAuthToken) {
@@ -368,8 +380,11 @@
                 console.error("Firebase initialization failed:", error);
                 showStatus('danger', `Setup Error: ${error.message}`);
                 loadingIndicator.textContent = `Setup Error: ${error.message}`;
+                
+                dbStatusMessage.innerHTML = `🔴 **CRITICAL ERROR:** Firebase Init Failed: ${error.message}. Data will not be saved.`;
+                dbStatusMessage.classList.remove('hidden');
                 isDbReady = false; // Ensure flag is false on error
-                dbStatusMessage.classList.remove('hidden'); // Show error in admin panel if visible
+                updateUIBasedOnIdentity(); // Update admin panel with error status
             }
         }
 
@@ -379,10 +394,6 @@
             if (userRole !== 'admin') {
                 return showStatus('danger', 'Permission denied. Only Admin can load fixtures.');
             }
-            // CRITICAL CHECK: Ensure database is ready before writing
-            if (!isDbReady || !db) {
-                return showStatus('danger', 'Database not ready. Cannot process fixtures. Check the status message above.');
-            }
 
             const pasteText = document.getElementById('fixtures-paste-area').value;
             const fixturesToLoad = parseFixturesText(pasteText);
@@ -391,7 +402,22 @@
                 return showStatus('warning', 'Could not parse any fixtures. Check your paste format and ensure it strictly follows: Date -> Home Team -> Away Team -> Venue -> Pitch -> Time.');
             }
 
-            showStatus('warning', `Parsed ${fixturesToLoad.length} fixtures. Starting database ingestion...`);
+            // --- CONSISTENCY FIX: Fallback to local rendering if DB is broken ---
+            if (!isDbReady || !db) {
+                showStatus('warning', `⚠️ Database not ready. Fixtures displayed locally (will NOT be saved). Please fix the Firebase Config issue for persistence.`);
+                
+                // Clear the existing list before displaying the new parsed data locally
+                document.getElementById('upcoming-fixtures-list').innerHTML = '';
+                document.getElementById('archived-fixtures-list').innerHTML = '';
+
+                // Render the parsed fixtures directly to the UI using the existing function
+                renderFixtures(fixturesToLoad);
+                return; // Exit here, preventing the failed write attempt
+            }
+            // --- END CONSISTENCY FIX ---
+
+            // --- Database write logic (only runs if isDbReady is true) ---
+            showStatus('warning', `Parsed ${fixturesToLoad.length} fixtures. Starting persistent database ingestion...`);
 
             const fixturesCollection = collection(db, FIRES_COLLECTION_PATH);
             const batch = writeBatch(db);
@@ -419,7 +445,7 @@
                 });
 
                 await batch.commit();
-                showStatus('success', `✅ Successfully loaded and activated ${fixturesToLoad.length} new fixtures.`);
+                showStatus('success', `✅ Successfully loaded and activated ${fixturesToLoad.length} new fixtures. They are now live!`);
                 document.getElementById('fixtures-paste-area').value = ''; // Clear input
             } catch (error) {
                 console.error("Data Load Failed:", error);
@@ -463,6 +489,7 @@
             const upcomingList = document.getElementById('upcoming-fixtures-list');
             const archivedList = document.getElementById('archived-fixtures-list');
             
+            // Clear lists only if we have new data to render (or the data is explicitly empty)
             upcomingList.innerHTML = '';
             archivedList.innerHTML = '';
             
@@ -475,7 +502,7 @@
                 // Attempt to create a date object for comparison (adjusting time format slightly for robustness)
                 const fixtureDateTime = new Date(fixture.date.replace(/(\d+)(st|nd|rd|th)/, '$1') + ' ' + fixture.time.replace('AM', ' AM').replace('PM', ' PM'));
 
-                const isPast = fixtureDateTime < now;
+                const isPast = isNaN(fixtureDateTime.getTime()) ? false : fixtureDateTime < now;
                 const targetList = isPast ? archivedList : upcomingList;
                 
                 if (!isPast) upcomingCount++; else archivedCount++;
@@ -591,7 +618,7 @@
         /** Referee volunteers or cancels volunteering for a match. */
         window.handleVolunteer = async function(matchId, isVolunteering) {
             if (!userName || userRole !== 'referee') return showStatus('danger', 'Please log in as a Referee first.');
-            if (!db) return showStatus('danger', 'Database connection not ready.');
+            if (!db || !isDbReady) return showStatus('danger', 'Database connection not ready. Cannot save volunteer status.');
 
             const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
             const refDoc = await getDoc(matchRef);
@@ -623,7 +650,7 @@
         /** Admin approves or declines a referee for a match. */
         window.handleApproval = async function(matchId, targetRefName, approve) {
             if (userRole !== 'admin') return showStatus('danger', 'Only administrators can approve/decline.');
-            if (!db) return showStatus('danger', 'Database connection not ready.');
+            if (!db || !isDbReady) return showStatus('danger', 'Database connection not ready. Cannot save approval status.');
 
             const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
             const refDoc = await getDoc(matchRef);
@@ -663,7 +690,7 @@
         /** Admin clears a final assignment. */
         window.handleUnassign = async function(matchId) {
              if (userRole !== 'admin') return showStatus('danger', 'Only administrators can unassign.');
-             if (!db) return showStatus('danger', 'Database connection not ready.');
+             if (!db || !isDbReady) return showStatus('danger', 'Database connection not ready. Cannot clear assignment.');
             
              const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
              try {
@@ -682,7 +709,7 @@
 
         /** Master function to start the app logic. */
         function startApp() {
-            // 1. Initialize UI state (Show login forms/admin panel if already logged in)
+            // 1. Initialize UI state (Shows login forms/admin panel if already logged in)
             updateUIBasedOnIdentity();
 
             // 2. Start Firebase connection attempt
