@@ -45,7 +45,6 @@
             <h1 class="text-4xl font-extrabold text-indigo-700">Weekly Fixture Management</h1>
             <p id="user-info" class="text-sm text-gray-600 mt-2"></p>
             <div class="mt-4 flex justify-center space-x-4">
-                <!-- ADDED onclick handler -->
                 <button id="toggle-view-btn" onclick="window.toggleView()" class="bg-purple-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-600 transition duration-150">
                     Switch to Referee View
                 </button>
@@ -73,7 +72,6 @@
                         <input type="password" id="admin-password" value="Redbarons321!"
                                class="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="Redbarons321!">
                     </div>
-                    <!-- ADDED onclick handler -->
                     <button id="admin-login-btn" onclick="window.handleAdminLogin()" class="btn-primary bg-indigo-600 text-white px-6 py-3 font-bold rounded-lg">
                         Login as Admin
                     </button>
@@ -88,10 +86,10 @@
                     <h2 class="text-2xl font-bold text-gray-800 mb-4">Admin: Fixture Ingestion</h2>
                     <p class="text-sm text-gray-600 mb-3">
                         Paste the JSON array of fixtures here. This data comes from your Tuesday automation script.
-                        <button onclick="loadMockData()" class="text-indigo-500 hover:text-indigo-700 font-medium">Load Mock Data</button>
+                        <button onclick="window.loadMockData()" class="text-indigo-500 hover:text-indigo-700 font-medium">Load Mock Data</button>
                     </p>
                     <textarea id="mock-data-area" rows="6" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder='[{"matchId": "123", "date": "2025-11-08", "time": "14:00", "home": "Team A", "away": "Team B", "pitch": "Main Field", "league": "Mens Prem"}, ...]'></textarea>
-                    <button id="ingest-btn" class="btn-primary w-full mt-4 bg-indigo-600 text-white px-6 py-3 font-bold rounded-lg disabled:opacity-50" disabled>
+                    <button id="ingest-btn" onclick="window.handleIngestFixtures()" class="btn-primary w-full mt-4 bg-indigo-600 text-white px-6 py-3 font-bold rounded-lg disabled:opacity-50" disabled>
                         1. Ingest/Update Weekly Fixtures
                     </button>
                     <p id="ingest-message" class="mt-2 text-sm text-green-600"></p>
@@ -239,12 +237,9 @@
                     localStorage.setItem('customRefName', customRefName);
                     // Force re-render of referee buttons after name change
                     if (!isViewAdmin) {
-                         // We don't have fixture data here, so we reload the view state.
-                         // The onSnapshot listener handles the full render shortly.
                          checkRefNameAndRenderButtons();
                     }
                 });
-
 
                 // Check if mock data is valid to enable button
                 ELEMENTS.mockDataArea.addEventListener('input', () => {
@@ -292,22 +287,20 @@
         };
         
         function setupUI() {
-            // Removed: ELEMENTS.adminLoginBtn.onclick = handleAdminLogin;
-            // Removed: ELEMENTS.toggleViewBtn.onclick = toggleView;
-            ELEMENTS.ingestBtn.onclick = handleIngestFixtures;
+            // Attach ingestion function globally for HTML onclick
+            window.handleIngestFixtures = handleIngestFixtures;
             
             // Set initial view state based on admin status
             updateAdminViewVisibility(isAdminLoggedIn);
             
             // Ensure initial view matches the default state
-            window.toggleView(false); // Call the global function
+            window.toggleView(true); 
         }
 
         // FIX: Define a global function (attached to window) so the HTML button's onclick can access it.
         window.loadMockData = function() {
             ELEMENTS.mockDataArea.value = MOCK_FIXTURES;
-            ELEMENTS.ingestBtn.disabled = false;
-            ELEMENTS.mockDataArea.dispatchEvent(new Event('input'));
+            ELEMENTS.mockDataArea.dispatchEvent(new Event('input')); // Re-check validity and enable button
         };
 
         // --- ADMIN LOGIN LOGIC (Made global for inline HTML use) ---
@@ -381,14 +374,18 @@
             ELEMENTS.refereeView.classList.toggle('hidden', isViewAdmin);
         };
 
+        // Attached to window in setupUI
         async function handleIngestFixtures() {
             const jsonText = ELEMENTS.mockDataArea.value.trim();
             if (!jsonText) return;
             
             if (!isAdminLoggedIn) {
-                ELEMENTS.ingestMessage.textContent = 'Error: Admin login required to ingest fixtures.';
+                ELEMENTS.ingestMessage.textContent = 'Error: Admin login required to ingest fixtures. Please log in above.';
                 ELEMENTS.ingestMessage.classList.remove('text-green-600');
                 ELEMENTS.ingestMessage.classList.add('text-red-600');
+                // Ensure the button is re-enabled but the operation is aborted
+                ELEMENTS.ingestBtn.disabled = false;
+                ELEMENTS.ingestBtn.textContent = '1. Ingest/Update Weekly Fixtures';
                 return;
             }
 
@@ -408,7 +405,7 @@
                 let ingestedCount = 0;
 
                 for (const fixture of newFixtures) {
-                    // Create a deterministic ID
+                    // Create a deterministic ID based on key fixture details
                     const idParts = [fixture.date, fixture.time, fixture.home, fixture.away];
                     const docId = idParts.map(p => (p || '').replace(/\s/g, '').toLowerCase().substring(0, 15)).join('-');
 
@@ -420,8 +417,8 @@
                         time: fixture.time, 
                         home: fixture.home,
                         away: fixture.away,
-                        pitch: fixture.pitch || 'TBD', // Default value for pitch
-                        league: fixture.league || 'Unknown League', // Default value for league
+                        pitch: fixture.pitch || 'TBD', 
+                        league: fixture.league || 'Unknown League',
                         // Preserve existing data on merge
                         assignedRefId: fixture.assignedRefId || null,
                         assignedRefName: fixture.assignedRefName || null,
@@ -441,7 +438,14 @@
 
             } catch (error) {
                 console.error("Ingestion Error:", error);
-                ELEMENTS.ingestMessage.textContent = `Error during ingestion: ${error.message}`;
+                
+                let errorMessage = `Error during ingestion: ${error.message}`;
+                // Specific check for Firebase permission errors (most likely cause of failure)
+                if (error.code && error.code.includes('permission-denied')) {
+                     errorMessage = "FIREBASE ERROR: Permission Denied. Are you fully signed in as Admin?";
+                }
+                
+                ELEMENTS.ingestMessage.textContent = errorMessage;
                 ELEMENTS.ingestMessage.classList.remove('text-green-600');
                 ELEMENTS.ingestMessage.classList.add('text-red-600');
             } finally {
@@ -450,17 +454,52 @@
             }
         }
 
+        // Made global by renderAdminView
+        async function handleApprove(fixtureId, refId, refName) {
+            if (!isAdminLoggedIn) return; // Security check
+
+            const fixtureRef = doc(db, getCollectionPath(), fixtureId);
+            
+            if (isVolunteerPhase()) {
+                console.error("Approval is locked until the volunteer phase ends (Friday 12:00 PM).");
+                return;
+            }
+
+            await updateDoc(fixtureRef, {
+                assignedRefId: refId,
+                assignedRefName: refName,
+                // Clear candidates after assignment
+                refCandidates: [], 
+                lastUpdated: Timestamp.now()
+            });
+        }
+        
+        // Made global by renderAdminView
+        async function handleUnassign(fixtureId) {
+            if (!isAdminLoggedIn) return; // Security check
+
+            const fixtureRef = doc(db, getCollectionPath(), fixtureId);
+            
+            await updateDoc(fixtureRef, {
+                assignedRefId: null,
+                assignedRefName: null,
+                lastUpdated: Timestamp.now()
+            });
+        }
+
+        // Made global by renderRefereeView
         async function handleVolunteer(fixtureId) {
             const name = ELEMENTS.refNameInput.value.trim();
             if (!name) {
+                // Should use a modal, but for now, console log and focus input
                 console.error("Please enter your referee name before volunteering.");
+                ELEMENTS.refNameInput.focus();
                 return;
             }
             if (!isVolunteerPhase()) {
                 console.error("Volunteering is locked. The admin approval phase is active.");
                 return;
             }
-
 
             const fixtureRef = doc(db, getCollectionPath(), fixtureId);
             const currentRefId = currentUserId;
@@ -496,44 +535,11 @@
                 console.error("Error volunteering for fixture:", error);
             }
         }
-        
-        async function handleApprove(fixtureId, refId, refName) {
-            if (!isAdminLoggedIn) return; // Security check
 
-            const fixtureRef = doc(db, getCollectionPath(), fixtureId);
-            
-            if (isVolunteerPhase()) {
-                console.error("Approval is locked until the volunteer phase ends (Friday 12:00 PM).");
-                return;
-            }
-
-            await updateDoc(fixtureRef, {
-                assignedRefId: refId,
-                assignedRefName: refName,
-                // Clear candidates after assignment
-                refCandidates: [], 
-                lastUpdated: Timestamp.now()
-            });
-        }
-        
-        async function handleUnassign(fixtureId) {
-            if (!isAdminLoggedIn) return; // Security check
-
-            const fixtureRef = doc(db, getCollectionPath(), fixtureId);
-            
-            await updateDoc(fixtureRef, {
-                assignedRefId: null,
-                assignedRefName: null,
-                lastUpdated: Timestamp.now()
-            });
-        }
-        
         // --- RENDER FUNCTIONS ---
 
         function checkRefNameAndRenderButtons() {
-             // This is a placeholder to trigger the button states in the referee view.
-             // The full render is done via onSnapshot, but this updates button classes/disabled state instantly.
-             // We ensure we have a name entered and the phase is correct.
+             // Updates button states and input field look dynamically
              const namePresent = ELEMENTS.refNameInput.value.trim().length > 0;
              const isVolunteeringAllowed = isVolunteerPhase();
 
@@ -548,17 +554,24 @@
              document.querySelectorAll('#referee-fixture-list button').forEach(button => {
                  // Only update 'Volunteer' buttons that aren't already set to 'Volunteered' or 'Locked'
                  if (button.textContent.includes('Volunteer')) {
-                     button.disabled = !namePresent || !isVolunteeringAllowed;
-                     button.classList.toggle('bg-indigo-600', !button.disabled);
-                     button.classList.toggle('hover:bg-indigo-700', !button.disabled);
-                     button.classList.toggle('bg-gray-400', button.disabled);
-                     button.classList.toggle('cursor-not-allowed', button.disabled);
+                     const isCandidateButton = button.textContent === 'Volunteered';
+                     if (!isCandidateButton) {
+                         button.disabled = !namePresent || !isVolunteeringAllowed;
+                         button.classList.toggle('bg-indigo-600', !button.disabled);
+                         button.classList.toggle('hover:bg-indigo-700', !button.disabled);
+                         button.classList.toggle('bg-gray-400', button.disabled);
+                         button.classList.toggle('cursor-not-allowed', button.disabled);
+                     }
                  }
              });
         }
 
 
         function renderAdminView(fixtures) {
+            // Re-attach global functions after every render update
+            window.handleApprove = handleApprove;
+            window.handleUnassign = handleUnassign;
+            
             const isAdminPhase = !isVolunteerPhase();
             
             ELEMENTS.adminPhaseMessage.textContent = isAdminPhase
@@ -584,7 +597,7 @@
                     .map(candidate => `
                     <div class="flex justify-between items-center bg-gray-100 p-2 rounded-lg my-1">
                         <span class="font-semibold text-gray-700">${candidate.name}</span>
-                        <button onclick="handleApprove('${fixture.id}', '${candidate.id}', '${candidate.name}')" 
+                        <button onclick="window.handleApprove('${fixture.id}', '${candidate.id}', '${candidate.name}')" 
                                 class="text-xs ${isAdminLoggedIn && isAdminPhase ? 'bg-indigo-500 hover:bg-indigo-600' : 'bg-gray-400 cursor-not-allowed'} text-white px-3 py-1 rounded transition" 
                                 ${isAdminLoggedIn && isAdminPhase ? '' : 'disabled'}>
                             Approve
@@ -605,7 +618,7 @@
                             <div class="text-right">
                                 ${isAssigned 
                                     ? `<p class="text-sm font-bold text-green-600 mb-1">Assigned: ${assigned}</p>
-                                       <button onclick="handleUnassign('${fixture.id}')" 
+                                       <button onclick="window.handleUnassign('${fixture.id}')" 
                                                class="text-xs ${isAdminLoggedIn ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-400 cursor-not-allowed'} text-white px-2 py-1 rounded transition"
                                                ${isAdminLoggedIn ? '' : 'disabled'}>
                                            Unassign
@@ -628,12 +641,12 @@
                     </div>
                 `;
             }).join('');
-            
-            window.handleApprove = handleApprove;
-            window.handleUnassign = handleUnassign;
         }
 
         function renderRefereeView(fixtures) {
+            // Re-attach global functions after every render update
+            window.handleVolunteer = handleVolunteer;
+            
             const isVolunteeringAllowed = isVolunteerPhase();
             const namePresent = ELEMENTS.refNameInput.value.trim().length > 0;
 
@@ -689,7 +702,7 @@
                         : `<span class="ref-tag bg-gray-300 text-gray-700">${isVolunteeringAllowed ? 'Enter Name Above' : 'Locked'}</span>`;
                     
                     actionButton = `
-                        <button onclick="handleVolunteer('${fixture.id}')" 
+                        <button onclick="window.handleVolunteer('${fixture.id}')" 
                                 class="text-xs ${buttonClasses(canVolunteer)} text-white px-3 py-1 rounded transition"
                                 ${canVolunteer ? '' : 'disabled'}>
                             Volunteer
@@ -719,7 +732,6 @@
                 `;
             }).join('');
             
-            window.handleVolunteer = handleVolunteer;
             checkRefNameAndRenderButtons(); // Ensure button state is correct immediately
         }
 
@@ -730,7 +742,7 @@
             { "date": "2025-11-08", "time": "15:30", "home": "Far Canal", "away": "Wellington Right Wingers", "pitch": "S1", "league": "St Pats 11s" },
             
             // Fixtures from 11 Nov 2025 (Tuesday) - Example 7s/5s Night Availability
-            { "date": "2025-11-11", "time": "Night", "home": "Mixed 7s Tuesday", "away": "OPEN NIGHT AVAILABILITY", "pitch": "Multiple", "league": "Night Referees" },
+            { "date": "2025-11-11", "time": "19:00", "home": "Mixed 7s Tuesday", "away": "The Dream Team", "pitch": "Turf 2", "league": "Night Referees" },
             
             // Fixtures from 13 Nov 2025 (Thursday) - Example 11s
             { "date": "2025-11-13", "time": "19:00", "home": "VUWAFC", "away": "Wanderers", "pitch": "T1", "league": "Uni Cup 11s" }
