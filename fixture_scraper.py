@@ -39,7 +39,8 @@ CSS_SELECTORS = {
     }
 }
 
-OUTPUT_FILE = 'weekly_fixtures_for_scheduler.json'
+# *** CRITICAL FIX: The HTML file looks for 'fixtures.json', so we match that name. ***
+OUTPUT_FILE = 'fixtures.json' 
 # --- END CONFIGURATION ---
 
 def get_target_date_range():
