@@ -66,7 +66,7 @@
         <!-- Admin Data Loading Panel -->
         <div id="admin-panel" class="mt-6 p-4 rounded-xl admin-section hidden">
             <h3 class="font-bold text-red-700 mb-3 border-b border-red-400 pb-2">Load Fixtures (Admin Only)</h3>
-            <p class="text-xs text-gray-700 mb-2">Paste the **EXACT** vertical schedule below (Date -> Home -> Away -> Venue -> Pitch -> Time).</p>
+            <p class="text-xs text-gray-700 mb-2">Paste the **EXACT** vertical schedule below (Date -> Home Team -> Away Team -> Venue -> Pitch -> Time).</p>
             <textarea id="fixtures-paste-area" rows="6" placeholder="Paste fixture data here..." class="w-full p-2 border border-red-300 rounded-lg text-xs"></textarea>
             <button onclick="parseAndLoadFixtures()" class="w-full mt-3 bg-red-600 text-white p-2 rounded-lg font-semibold hover:bg-red-700 transition duration-150 shadow-md">
                 Process and Load Fixtures
@@ -122,6 +122,7 @@
         let userId = null;
         let userName = ''; 
         let userRole = 'none';
+        let isDbReady = false; // NEW: Database readiness flag
 
         // --- Utility Functions ---
 
@@ -156,7 +157,7 @@
             // Time format: e.g., 06:00 PM
             const timeRegex = /\d{1,2}:\d{2}\s*(AM|PM)/i;
             // Headers to ignore
-            const headers = ['venue', 'pitch', 'time', 'vs', 'vs:']; // Added 'vs:' as a safety
+            const headers = ['venue', 'pitch', 'time', 'vs', 'vs:']; 
 
             let currentDate = null;
             let fixtureState = 0; // 0=Waiting for Home, 1=Waiting for Away, 2=Waiting for Venue, 3=Waiting for Pitch, 4=Waiting for Time
@@ -247,7 +248,10 @@
                 if (userRole === 'admin') {
                     document.getElementById('display-role').textContent = 'Administrator';
                     document.getElementById('display-role').classList.add('text-red-600');
-                    adminPanel.classList.remove('hidden');
+                    // Only show admin panel if DB is ready
+                    if (isDbReady) {
+                        adminPanel.classList.remove('hidden');
+                    }
                 } else {
                     document.getElementById('display-role').textContent = 'Referee';
                     document.getElementById('display-role').classList.remove('text-red-600');
@@ -308,9 +312,11 @@
         // --- Core Firebase Setup ---
 
         async function initFirebase() {
+            const loadingIndicator = document.getElementById('loading-indicator');
+
             if (!Object.keys(firebaseConfig).length) {
                 console.error("Firebase config is missing. Displaying fallback message.");
-                document.getElementById('loading-indicator').textContent = 'ERROR: Firebase config missing. Cannot connect to database.';
+                loadingIndicator.textContent = 'ERROR: Firebase config missing. Cannot connect to database.';
                 return;
             }
             
@@ -318,6 +324,8 @@
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
+                isDbReady = true; // DB instance is available
+                loadingIndicator.innerHTML = '<p class="mt-3">Awaiting Authentication...</p>';
 
                 // Sign in anonymously to get a base UID and establish a connection
                 if (initialAuthToken) {
@@ -329,16 +337,16 @@
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         setupDataListener();
-                        document.getElementById('loading-indicator').innerHTML = '<p class="mt-3">Awaiting user login...</p>';
+                        updateUIBasedOnIdentity(); // Rerun to show admin panel if already logged in as admin
                     } else {
-                        document.getElementById('loading-indicator').textContent = 'Authentication failed. Please refresh.';
+                        loadingIndicator.textContent = 'Authentication failed. Please refresh.';
                     }
                 });
 
             } catch (error) {
                 console.error("Firebase initialization failed:", error);
                 showStatus('danger', `Setup Error: ${error.message}`);
-                document.getElementById('loading-indicator').textContent = `Setup Error: ${error.message}`;
+                loadingIndicator.textContent = `Setup Error: ${error.message}`;
             }
         }
 
@@ -348,7 +356,10 @@
             if (userRole !== 'admin') {
                 return showStatus('danger', 'Permission denied. Only Admin can load fixtures.');
             }
-            if (!db) return showStatus('danger', 'Database not ready.');
+            // CRITICAL FIX: Check isDbReady flag
+            if (!isDbReady || !db) {
+                return showStatus('danger', 'Database connection not initialized. Please wait a moment and try again.');
+            }
 
             const pasteText = document.getElementById('fixtures-paste-area').value;
             const fixturesToLoad = parseFixturesText(pasteText);
@@ -397,8 +408,12 @@
         
         function setupDataListener() {
             const fixturesRef = collection(db, FIRES_COLLECTION_PATH);
+            const loadingIndicator = document.getElementById('loading-indicator');
             
             onSnapshot(fixturesRef, (snapshot) => {
+                // Hide loading indicator as soon as data is received
+                loadingIndicator.classList.add('hidden'); 
+                
                 const allFixtures = [];
                 snapshot.forEach(doc => {
                     allFixtures.push({ id: doc.id, ...doc.data() });
@@ -416,7 +431,8 @@
             }, (error) => {
                 console.error("Firestore listen failed:", error);
                 showStatus('danger', 'Error fetching live schedule data.');
-                document.getElementById('loading-indicator').textContent = 'Error loading data.';
+                loadingIndicator.textContent = 'Error loading data.';
+                loadingIndicator.classList.remove('hidden');
             });
         }
 
@@ -427,14 +443,13 @@
             upcomingList.innerHTML = '';
             archivedList.innerHTML = '';
             
-            // Simple check to determine if a date is past. Not strictly accurate but good enough for archiving.
+            // Simple check to determine if a date is past.
             const now = new Date();
             let upcomingCount = 0;
             let archivedCount = 0;
 
             allFixtures.forEach(fixture => {
-                // Heuristic check for archiving: Compare fixture date string to today's date string.
-                // This is a robust way to avoid complex date parsing errors on the client side.
+                // Attempt to create a date object for comparison (adjusting time format slightly for robustness)
                 const fixtureDateTime = new Date(fixture.date.replace(/(\d+)(st|nd|rd|th)/, '$1') + ' ' + fixture.time.replace('AM', ' AM').replace('PM', ' PM'));
 
                 const isPast = fixtureDateTime < now;
