@@ -376,25 +376,29 @@
 
         // Attached to window in setupUI
         async function handleIngestFixtures() {
-            const jsonText = ELEMENTS.mockDataArea.value.trim();
-            if (!jsonText) return;
-            
-            if (!isAdminLoggedIn) {
-                ELEMENTS.ingestMessage.textContent = 'Error: Admin login required to ingest fixtures. Please log in above.';
-                ELEMENTS.ingestMessage.classList.remove('text-green-600');
-                ELEMENTS.ingestMessage.classList.add('text-red-600');
-                // Ensure the button is re-enabled but the operation is aborted
-                ELEMENTS.ingestBtn.disabled = false;
-                ELEMENTS.ingestBtn.textContent = '1. Ingest/Update Weekly Fixtures';
-                return;
-            }
-
-
+            // 1. Immediate Feedback
             ELEMENTS.ingestBtn.disabled = true;
             ELEMENTS.ingestBtn.textContent = 'Ingesting...';
-            ELEMENTS.ingestMessage.textContent = 'Processing and saving fixtures...';
+            ELEMENTS.ingestMessage.textContent = 'Checking authentication and processing...';
             ELEMENTS.ingestMessage.classList.remove('text-red-600');
             ELEMENTS.ingestMessage.classList.add('text-green-600');
+            
+            // 2. Pre-flight Checks
+            const jsonText = ELEMENTS.mockDataArea.value.trim();
+            if (!jsonText) {
+                ELEMENTS.ingestMessage.textContent = 'Error: Fixture data area is empty. Please load mock data or paste JSON.';
+                ELEMENTS.ingestMessage.classList.remove('text-green-600');
+                ELEMENTS.ingestMessage.classList.add('text-red-600');
+                // The finally block will reset the button state
+                return; 
+            }
+            if (!isAdminLoggedIn) {
+                ELEMENTS.ingestMessage.textContent = 'Error: Admin login required to ingest fixtures. Please click "Login as Admin" first.';
+                ELEMENTS.ingestMessage.classList.remove('text-green-600');
+                ELEMENTS.ingestMessage.classList.add('text-red-600');
+                // The finally block will reset the button state
+                return;
+            }
 
             try {
                 const newFixtures = JSON.parse(jsonText);
@@ -433,7 +437,7 @@
 
                 await batch.commit();
 
-                ELEMENTS.ingestMessage.textContent = `Successfully ingested and updated ${ingestedCount} fixtures.`;
+                ELEMENTS.ingestMessage.textContent = `✅ Success: Successfully ingested and updated ${ingestedCount} fixtures.`;
                 ELEMENTS.mockDataArea.value = ''; 
 
             } catch (error) {
@@ -445,10 +449,11 @@
                      errorMessage = "FIREBASE ERROR: Permission Denied. Are you fully signed in as Admin?";
                 }
                 
-                ELEMENTS.ingestMessage.textContent = errorMessage;
+                ELEMENTS.ingestMessage.textContent = `❌ ${errorMessage}`;
                 ELEMENTS.ingestMessage.classList.remove('text-green-600');
                 ELEMENTS.ingestMessage.classList.add('text-red-600');
             } finally {
+                 // 3. Reset Button State
                 ELEMENTS.ingestBtn.disabled = false;
                 ELEMENTS.ingestBtn.textContent = '1. Ingest/Update Weekly Fixtures';
             }
