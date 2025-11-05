@@ -19,8 +19,12 @@
             display: flex;
             flex-direction: column;
             cursor: default; 
+            border-radius: 0.75rem; /* rounded-xl */
         }
-        
+        .night-shift-card {
+            border: 2px solid #3b82f6; /* Blue border */
+            background-color: #eff6ff; /* Blue light background */
+        }
         .fixture-main-content {
             display: flex;
             align-items: center;
@@ -32,12 +36,6 @@
             padding: 0.5rem 1rem;
             border-top: 1px solid #f3f4f6;
             background-color: #fff; 
-        }
-
-        /* Admin specific styles */
-        .admin-section {
-            background-color: #ffe0e0;
-            border: 2px solid #ef4444;
         }
 
         /* Modal Backdrop */
@@ -65,15 +63,24 @@
             transform: scale(1);
         }
 
+        /* Fixed Identity Button */
+        #identity-fixed-button {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 40;
+            min-width: 80px;
+        }
+        
         /* Responsive adjustments for layout */
         @media (min-width: 640px) {
             .fixture-card {
                 flex-direction: row; 
-                height: 80px; 
+                min-height: 80px; 
                 padding: 0;
             }
             .fixture-main-content {
-                padding: 0 1rem;
+                padding: 0.75rem 1rem;
             }
             .fixture-action-area {
                 width: 150px; 
@@ -85,103 +92,171 @@
                 align-items: center;
                 justify-content: center;
             }
+            .night-shift-card .fixture-action-area {
+                width: 180px;
+            }
         }
     </style>
 </head>
-<body class="min-h-screen p-4 sm:p-8">
+<body class="min-h-screen p-4 sm:p-8 pt-20"> <!-- Added padding for fixed element -->
 
     <!-- Status Message Area -->
     <div id="status-message" class="fixed top-4 left-1/2 -translate-x-1/2 p-3 rounded-xl shadow-xl z-50 hidden transition-all duration-300 transform" style="max-width: 90vw;"></div>
 
-    <!-- Right-Side Auth & Admin Panel (Sticky on Desktop) -->
-    <div id="user-control-panel" class="w-full max-w-sm mx-auto bg-white p-4 rounded-xl shadow-2xl border-t-4 border-red-600 mb-8 sm:mb-0 sm:float-right sm:sticky sm:top-8">
-        <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">My Identity & Tools</h2>
-        
-        <!-- Identity Input Form (Default View) -->
-        <div id="identity-form" class="space-y-3">
-            <h3 class="font-bold text-lg text-gray-700">Referee Login</h3>
-            <input type="text" id="referee-name-input" placeholder="Enter Your Full Name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
-            <button onclick="handleRefereeLogin()" class="w-full bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700 transition duration-150 shadow-md">
-                Login as Referee
-            </button>
-            <button onclick="showAdminLoginForm()" class="w-full text-sm text-red-600 hover:text-red-700 p-2">
-                Admin Login
-            </button>
-        </div>
-
-        <!-- Admin Login Form (Hidden by Default) -->
-        <div id="admin-login-form" class="space-y-3 hidden">
-            <h3 class="font-bold text-lg text-red-700">Admin Login</h3>
-            <input type="email" id="admin-email" value="admin@betterfootball.co.nz" placeholder="Email" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
-            <input type="password" id="admin-password" value="password" placeholder="Password" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
-            <button onclick="handleAdminLogin()" class="w-full bg-red-600 text-white p-3 rounded-lg font-semibold hover:bg-red-700 transition duration-150 shadow-md">
-                Login as Admin
-            </button>
-            <button onclick="showRefereeLoginForm()" class="w-full text-sm text-gray-600 hover:text-gray-700 p-2">
-                Back to Referee Login
-            </button>
-        </div>
-
-        <!-- Identity Display (after login) -->
-        <div id="identity-display" class="hidden">
-            <p class="mb-2 text-sm"><span class="font-semibold text-gray-700">Logged In As:</span> <span id="display-ref-name" class="font-bold text-lg text-red-600"></span></p>
-            <p class="mb-2 text-sm"><span class="font-semibold text-gray-700">Role:</span> <span id="display-role" class="font-bold"></span></p>
-            <button onclick="clearIdentity()" class="text-xs text-gray-500 hover:text-red-500">Logout</button>
-        </div>
-
-        <!-- Admin Data Loading Panel (Collapsible) -->
-        <div id="admin-panel" class="mt-6 p-4 rounded-xl admin-section hidden transition-all duration-300">
-            <div id="admin-panel-summary" class="flex justify-between items-center cursor-pointer">
-                <h3 class="font-bold text-red-700">Load Fixtures (Admin Tool)</h3>
-                <span id="admin-toggle-icon" class="text-red-700 text-xl font-bold">+</span>
-            </div>
-
-            <div id="admin-panel-details" class="mt-3 pt-3 border-t border-red-400 hidden">
-                <p class="text-xs text-gray-700 mb-2">Paste the **EXACT** vertical schedule below. *Fixtures with 'bye' will be skipped.*</p>
-                <textarea id="fixtures-paste-area" rows="6" placeholder="Paste fixture data here..." class="w-full p-2 border border-red-300 rounded-lg text-xs"></textarea>
-                <button onclick="parseAndLoadFixtures()" class="w-full mt-3 bg-red-600 text-white p-2 rounded-lg font-semibold hover:bg-red-700 transition duration-150 shadow-md">
-                    Process and Load Fixtures
-                </button>
-                <p id="db-status-message" class="text-xs font-semibold text-red-700 mt-2 hidden">
-                    <span class="animate-pulse">Attempting to connect to database...</span>
-                </p>
+    <!-- --- FLOATING IDENTITY BUTTON & LOGOUT --- -->
+    <div id="identity-fixed-button" class="shadow-xl rounded-full">
+        <!-- Default State: Login Button -->
+        <button id="login-button" onclick="openIdentityModal()" class="bg-indigo-600 text-white p-3 rounded-full font-semibold hover:bg-indigo-700 transition duration-150 shadow-lg text-sm flex items-center hidden">
+            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3v-1m3-4h14"></path></svg>
+            Login
+        </button>
+        <!-- Logged In State: Name & Logout -->
+        <div id="logged-in-panel" class="bg-white p-3 rounded-xl shadow-lg border-t-2 border-indigo-600 hidden text-sm font-semibold cursor-pointer" onclick="openIdentityModal()">
+            <div class="flex items-center justify-between space-x-2">
+                <span class="truncate max-w-[100px]" id="display-ref-name-small"></span>
+                <span class="text-xs text-gray-500 hover:text-red-500 transition" onclick="event.stopPropagation(); clearIdentity();">Logout</span>
             </div>
         </div>
     </div>
-    
+
+    <!-- --- IDENTITY & ADMIN MODAL (POP-UP) --- -->
+    <div id="identity-modal-backdrop" class="modal-backdrop transition-opacity duration-300">
+        <div id="identity-modal-content" class="modal-content bg-white p-6 rounded-xl shadow-2xl">
+            <h3 class="text-2xl font-bold text-gray-800 border-b pb-2 mb-4">Identity & Tools</h3>
+            
+            <!-- Identity Input Form (Default View) -->
+            <div id="identity-form" class="space-y-3">
+                <h3 class="font-bold text-lg text-gray-700">Referee Login</h3>
+                <input type="text" id="referee-name-input" placeholder="Enter Your Full Name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                <button onclick="handleRefereeLogin()" class="w-full bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700 transition duration-150 shadow-md">
+                    Login as Referee
+                </button>
+                <button onclick="showAdminLoginForm()" class="w-full text-sm text-red-600 hover:text-red-700 p-2">
+                    Admin Login
+                </button>
+            </div>
+
+            <!-- Admin Login Form (Hidden by Default) -->
+            <div id="admin-login-form" class="space-y-3 hidden">
+                <h3 class="font-bold text-lg text-red-700">Admin Login</h3>
+                <input type="email" id="admin-email" value="admin@betterfootball.co.nz" placeholder="Email" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
+                <input type="password" id="admin-password" value="password" placeholder="Password" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
+                <button onclick="handleAdminLogin()" class="w-full bg-red-600 text-white p-3 rounded-lg font-semibold hover:bg-red-700 transition duration-150 shadow-md">
+                    Login as Admin
+                </button>
+                <button onclick="showRefereeLoginForm()" class="w-full text-sm text-gray-600 hover:text-gray-700 p-2">
+                    Back to Referee Login
+                </button>
+            </div>
+
+            <!-- Identity Display (Admin/Referee) -->
+            <div id="identity-display" class="hidden space-y-4">
+                <p class="mb-2 text-sm"><span class="font-semibold text-gray-700">Logged In As:</span> <span id="display-ref-name" class="font-bold text-xl text-red-600"></span></p>
+                <p class="mb-2 text-sm"><span class="font-semibold text-gray-700">Role:</span> <span id="display-role" class="font-bold"></span></p>
+
+                <!-- Admin Data Loading Panel (Inside Modal) -->
+                <div id="admin-panel" class="mt-6 p-4 rounded-xl bg-red-50 border-2 border-red-300 hidden transition-all duration-300 space-y-3">
+                    <h3 class="font-bold text-lg text-red-700 border-b pb-2">Admin Tools</h3>
+                    
+                    <button onclick="openBulkLoadModal()" class="w-full bg-red-600 text-white p-3 rounded-lg font-semibold hover:bg-red-700 transition duration-150 shadow-md">
+                        Load/Replace All 11s Fixtures
+                    </button>
+                    
+                    <p id="db-status-message" class="text-xs font-semibold text-red-700 mt-2 hidden">
+                        <span class="animate-pulse">Attempting to connect to database...</span>
+                    </p>
+                </div>
+                
+                <button onclick="clearIdentity(); closeIdentityModal();" class="mt-4 w-full text-sm text-gray-500 hover:text-red-500 p-2 border rounded-lg">Logout</button>
+            </div>
+            
+            <button onclick="closeIdentityModal()" class="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- --- BULK FIXTURE LOAD MODAL (Admin Only) --- -->
+    <div id="bulk-load-modal-backdrop" class="modal-backdrop transition-opacity duration-300">
+        <div class="modal-content bg-white p-6 rounded-xl shadow-2xl">
+            <h3 class="text-2xl font-bold text-red-600 border-b pb-2 mb-4">Bulk Fixture Input (Admin)</h3>
+            <p class="text-sm text-gray-600 mb-4">Paste the **EXACT** vertical schedule below. *Fixtures with 'bye' will be skipped.*</p>
+            <textarea id="fixtures-paste-area" rows="10" placeholder="Paste fixture data here..." class="w-full p-3 border border-red-300 rounded-lg text-sm focus:ring-red-500 focus:border-red-500"></textarea>
+            <div class="flex justify-end pt-4 space-x-3">
+                <button type="button" onclick="closeBulkLoadModal()" class="px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-100 transition">
+                    Cancel
+                </button>
+                <button onclick="parseAndLoadFixtures()" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition shadow-md">
+                    Process and Load Fixtures
+                </button>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Main Content Grid -->
-    <main class="w-full max-w-4xl mx-auto sm:mr-96">
+    <main class="w-full max-w-4xl mx-auto">
         <header class="text-center mb-8">
             <h1 class="text-4xl font-extrabold text-gray-900 mb-2">Weekly Match Assignments</h1>
             <p id="ref-greeting" class="text-xl text-gray-600">Please log in to view the schedule.</p>
         </header>
+
+        <!-- --- NIGHT SHIFT VOTING/VOLUNTEERING SECTION --- -->
+        <h2 class="text-2xl font-bold text-gray-700 border-b pb-2 mb-4">Night Shifts (7s & 5s)</h2>
+        <div id="night-shifts-list" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <!-- Night shift cards will be rendered here -->
+            <p id="night-shifts-loading" class="text-center py-4 text-gray-500 col-span-full">Loading night shifts...</p>
+        </div>
         
-        <!-- Upcoming Fixtures -->
-        <h2 class="text-2xl font-bold text-gray-700 border-b pb-2 mb-4">Upcoming Schedule</h2>
-        <div id="upcoming-fixtures-list" class="space-y-3">
-            <div id="loading-indicator" class="text-center text-gray-500 py-10">
-                <svg class="animate-spin h-8 w-8 text-gray-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <p class="mt-3" id="loading-text">Connecting to database...</p>
+        <!-- --- TABBED FIXTURE SCHEDULE --- -->
+        <h2 class="text-2xl font-bold text-gray-700 border-b pb-2 mb-4">11s Fixtures</h2>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-gray-300 mb-6">
+            <button id="tab-upcoming" onclick="setActiveTab('upcoming')" class="tab-button active-tab">
+                Upcoming Schedule
+            </button>
+            <button id="tab-my-assignments" onclick="setActiveTab('my-assignments')" class="tab-button inactive-tab">
+                My Assignments (<span id="my-assignments-count">0</span>)
+            </button>
+        </div>
+        
+        <!-- Upcoming Fixtures Content -->
+        <div id="content-upcoming" class="tab-content space-y-3">
+            <div id="upcoming-fixtures-list">
+                <div id="loading-indicator" class="text-center text-gray-500 py-10">
+                    <svg class="animate-spin h-8 w-8 text-gray-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="mt-3" id="loading-text">Connecting to database...</p>
+                </div>
             </div>
         </div>
+        
+        <!-- My Assignments Content (Hidden by Default) -->
+        <div id="content-my-assignments" class="tab-content space-y-3 hidden">
+            <div id="my-assignments-list" class="space-y-3">
+                <p class="text-center py-10 text-gray-500">Your approved assignments will appear here once you are logged in and scheduled by the admin.</p>
+            </div>
+        </div>
+        
     </main>
     
-    <!-- Admin Assignment Modal (Hidden) -->
+    <!-- --- ADMIN ASSIGNMENT MODAL --- -->
     <div id="admin-assignment-modal-backdrop" class="modal-backdrop transition-opacity duration-300">
         <div id="admin-assignment-modal-content" class="modal-content bg-white p-6 rounded-xl shadow-2xl">
             <h3 class="text-2xl font-bold text-red-600 border-b pb-2 mb-4" id="modal-match-title"></h3>
             <p class="text-sm text-gray-600 mb-4" id="modal-match-details"></p>
 
-            <form id="assignment-form" onsubmit="return false;" class="space-y-3">
+            <!-- Volunteer List & Assignment -->
+            <div class="space-y-4 mb-6">
                 <p class="font-semibold text-gray-700">Select Referee to Assign:</p>
                 <div id="volunteer-list-container" class="bg-gray-100 p-3 rounded-lg max-h-48 overflow-y-auto space-y-2 border">
                     <!-- Volunteer radio buttons will be inserted here -->
                 </div>
                 <input type="hidden" id="modal-match-id">
-                <div class="flex justify-end pt-4 space-x-3">
+                <div class="flex justify-end pt-4 space-x-3 border-t">
                     <button type="button" onclick="closeAssignmentModal()" class="px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-100 transition">
                         Cancel
                     </button>
@@ -189,7 +264,19 @@
                         Confirm Assignment
                     </button>
                 </div>
-            </form>
+            </div>
+
+            <!-- Admin Quick Edit Section -->
+            <div id="admin-edit-section" class="bg-yellow-50 p-4 rounded-lg border border-yellow-300 space-y-3 hidden">
+                <h4 class="font-bold text-lg text-yellow-800">Quick Edit Details (11s Only)</h4>
+                <input type="text" id="edit-time" placeholder="Time (e.g., 7:00 PM)" class="w-full p-2 border rounded-lg">
+                <input type="text" id="edit-venue" placeholder="Venue" class="w-full p-2 border rounded-lg">
+                <input type="text" id="edit-pitch" placeholder="Pitch" class="w-full p-2 border rounded-lg">
+                <button onclick="handleQuickEdit()" class="w-full bg-yellow-600 text-white p-2 rounded-lg font-semibold hover:bg-yellow-700 transition">
+                    Save Edits & Refresh
+                </button>
+            </div>
+            
         </div>
     </div>
 
@@ -215,10 +302,19 @@
         const FIRES_COLLECTION_PATH = `/artifacts/${appId}/public/data/fixtures`;
         const LOCAL_STORAGE_KEY = `referee-fixtures-${appId}`;
 
+        const NIGHT_SHIFTS = [
+            { id: 'shift-mon-bw', home: 'Monday 7s/5s', away: 'Boyd Wilson', date: 'Mon', time: '5:50 PM - 10:10 PM', venue: 'BW', pitch: 'ALL', isNightShift: true },
+            { id: 'shift-wed-bw', home: 'Wednesday 7s/5s', away: 'Boyd Wilson', date: 'Wed', time: '5:50 PM - 10:10 PM', venue: 'BW', pitch: 'ALL', isNightShift: true },
+            { id: 'shift-wed-am', home: 'Wednesday 7s/5s', away: 'Alex Moore', date: 'Wed', time: '7:20 PM - 9:40 PM', venue: 'AM', pitch: 'ALL', isNightShift: true },
+            { id: 'shift-tue-hub', home: 'Tuesday 5s', away: 'The Hub', date: 'Tue', time: '7:00 PM - 10:00 PM', venue: 'Hub', pitch: 'ALL', isNightShift: true },
+            { id: 'shift-thu-te', home: 'Thursday 5s', away: 'Te Whaea', date: 'Thu', time: '7:20 PM - 9:40 PM', venue: 'Te Whaea', pitch: 'ALL', isNightShift: true },
+        ];
+
+
         // Firebase Imports (using CDN links)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, doc, updateDoc, onSnapshot, writeBatch, query, getDocs, serverTimestamp, arrayUnion, arrayRemove, setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, doc, updateDoc, onSnapshot, writeBatch, query, getDocs, serverTimestamp, arrayUnion, arrayRemove, setLogLevel, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         
         // Global State
         let app, db, auth;
@@ -226,6 +322,8 @@
         let userName = ''; 
         let userRole = 'none';
         let isDbReady = false; 
+        let allFixturesCache = []; // Cache for all fixtures (11s + shifts)
+        let activeTab = 'upcoming'; // Default active tab
 
         // Turn on debug logging for better troubleshooting
         setLogLevel('Debug');
@@ -273,7 +371,7 @@
             statusDiv.className = 'fixed top-4 left-1/2 -translate-x-1/2 p-3 rounded-xl shadow-xl z-50 transition-all duration-300 transform';
             statusDiv.classList.remove('hidden');
 
-            statusDiv.classList.remove('bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-yellow-100', 'text-yellow-800', 'border-green-500', 'border-red-500', 'border-yellow-500');
+            statusDiv.classList.remove('bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-yellow-100', 'text-yellow-800', 'border-green-500', 'border-red-500', 'border-yellow-500', 'bg-indigo-100', 'text-indigo-800', 'border-indigo-500');
             
             if (type === 'success') {
                 statusDiv.classList.add('bg-green-100', 'text-green-800', 'border', 'border-green-500');
@@ -281,6 +379,8 @@
                 statusDiv.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-500');
             } else if (type === 'warning') {
                 statusDiv.classList.add('bg-yellow-100', 'text-yellow-800', 'border', 'border-yellow-500');
+            } else if (type === 'info') {
+                statusDiv.classList.add('bg-indigo-100', 'text-indigo-800', 'border', 'border-indigo-500');
             }
             
             setTimeout(() => {
@@ -348,20 +448,25 @@
                             if (currentFixture.home.toLowerCase().includes(BYE_KEYWORD) || currentFixture.away.toLowerCase().includes(BYE_KEYWORD)) {
                                 console.log(`Skipping fixture due to 'bye': ${currentFixture.home} vs ${currentFixture.away}`);
                             } else {
-                                const dateObj = new Date(`${currentFixture.date} ${currentFixture.time}`);
+                                try {
+                                    const dateObj = new Date(`${currentFixture.date} ${currentFixture.time}`);
                                 
-                                // Create a stable temporary ID for local storage
-                                const tempId = crypto.randomUUID(); 
+                                    // Create a stable temporary ID for local storage
+                                    const tempId = crypto.randomUUID(); 
 
-                                fixtures.push({
-                                    ...currentFixture,
-                                    id: tempId, // Use this for local storage fixtures
-                                    dateSortable: dateObj.getTime(),
-                                    dateFormatted: dateFormatter.format(dateObj),
-                                    assignedRef: null,
-                                    volunteers: [], 
-                                    status: 'open',
-                                });
+                                    fixtures.push({
+                                        ...currentFixture,
+                                        id: tempId, // Use this for local storage fixtures
+                                        dateSortable: dateObj.getTime(),
+                                        dateFormatted: dateFormatter.format(dateObj),
+                                        isNightShift: false, // Explicitly mark as 11s
+                                        assignedRef: null,
+                                        volunteers: [], 
+                                        status: 'open',
+                                    });
+                                } catch (e) {
+                                    console.error(`Error parsing date/time for fixture: ${currentFixture.home} vs ${currentFixture.away}`, e);
+                                }
                             }
                             
                             fixtureState = 0; 
@@ -376,27 +481,34 @@
         // --- Identity Management ---
         
         function updateUIBasedOnIdentity() {
-            // FIX: Cache all elements and check for null before operating (prevents TypeError)
-            const display = document.getElementById('identity-display');
-            const refForm = document.getElementById('identity-form');
+            const loginBtn = document.getElementById('login-button');
+            const loggedInPanel = document.getElementById('logged-in-panel');
+            const identityForm = document.getElementById('identity-form');
             const adminForm = document.getElementById('admin-login-form');
-            const greeting = document.getElementById('ref-greeting');
+            const identityDisplay = document.getElementById('identity-display');
             const adminPanel = document.getElementById('admin-panel');
             const dbStatusMessage = document.getElementById('db-status-message');
-            const loadingText = document.getElementById('loading-text');
             const displayRefName = document.getElementById('display-ref-name');
+            const displayRefNameSmall = document.getElementById('display-ref-name-small');
             const displayRole = document.getElementById('display-role');
+            const greeting = document.getElementById('ref-greeting');
 
-            // Reset forms and display
-            if (refForm) refForm.classList.add('hidden');
-            if (adminForm) adminForm.classList.add('hidden');
-            if (display) display.classList.add('hidden');
-            if (adminPanel) adminPanel.classList.add('hidden');
+            // Reset visibility
+            loginBtn?.classList.add('hidden');
+            loggedInPanel?.classList.add('hidden');
+            identityForm?.classList.add('hidden');
+            adminForm?.classList.add('hidden');
+            identityDisplay?.classList.add('hidden');
+            adminPanel?.classList.add('hidden');
+
 
             if (userName) {
-                // Logged In: Show identity
-                if (display) display.classList.remove('hidden');
+                // LOGGED IN
+                loggedInPanel?.classList.remove('hidden');
+                identityDisplay?.classList.remove('hidden');
+                
                 if (displayRefName) displayRefName.textContent = userName;
+                if (displayRefNameSmall) displayRefNameSmall.textContent = userName;
                 if (greeting) greeting.textContent = `Welcome, ${userName}. View and manage assignments below.`;
 
                 if (userRole === 'admin') {
@@ -404,9 +516,7 @@
                         displayRole.textContent = 'Administrator';
                         displayRole.classList.add('text-red-600');
                     }
-                    
-                    // Admin: Show tool panel
-                    if (adminPanel) adminPanel.classList.remove('hidden');
+                    adminPanel?.classList.remove('hidden');
 
                     if (dbStatusMessage) {
                         if (isDbReady) {
@@ -425,40 +535,41 @@
                 }
                 
             } else {
-                // Logged Out - Show default referee form
-                if (refForm) refForm.classList.remove('hidden');
+                // LOGGED OUT
+                loginBtn?.classList.remove('hidden');
+                identityForm?.classList.remove('hidden'); // Show referee login by default in the modal
                 if (greeting) greeting.textContent = 'Please log in to view the schedule.';
                 userRole = 'none';
             }
-            
-            // Update loading status based on DB readiness
-            if (loadingText) {
-                if (!isDbReady) {
-                    loadingText.innerHTML = '⚠️ Using local storage. Data is **NOT** persistent or shared.';
-                } else if (!userName) {
-                    loadingText.textContent = 'Please log in to load the schedule.';
-                }
-            }
-        }
-
-        window.toggleAdminPanel = function() {
-            const details = document.getElementById('admin-panel-details');
-            const icon = document.getElementById('admin-toggle-icon');
-            
-            if (details && icon) {
-                if (details.classList.contains('hidden')) {
-                    details.classList.remove('hidden');
-                    icon.textContent = '−'; 
-                } else {
-                    details.classList.add('hidden');
-                    icon.textContent = '+';
-                }
-            }
         }
         
-        // Ensure the summary element exists before setting click handler
-        const adminPanelSummary = document.getElementById('admin-panel-summary');
-        if (adminPanelSummary) adminPanelSummary.onclick = window.toggleAdminPanel;
+        window.openIdentityModal = function() {
+            const modalBackdrop = document.getElementById('identity-modal-backdrop');
+            if (!modalBackdrop) return;
+            // Set the correct form visibility when opening the modal
+            if (userName) {
+                document.getElementById('identity-form')?.classList.add('hidden');
+                document.getElementById('admin-login-form')?.classList.add('hidden');
+                document.getElementById('identity-display')?.classList.remove('hidden');
+            } else {
+                document.getElementById('identity-form')?.classList.remove('hidden');
+                document.getElementById('admin-login-form')?.classList.add('hidden');
+                document.getElementById('identity-display')?.classList.add('hidden');
+            }
+
+            modalBackdrop.classList.add('show');
+            modalBackdrop.style.display = 'flex';
+        }
+
+        window.closeIdentityModal = function() {
+            const modalBackdrop = document.getElementById('identity-modal-backdrop');
+            if (!modalBackdrop) return;
+
+            modalBackdrop.classList.remove('show');
+            setTimeout(() => {
+                modalBackdrop.style.display = 'none';
+            }, 300);
+        }
 
         window.showAdminLoginForm = function() {
             const refForm = document.getElementById('identity-form');
@@ -489,6 +600,7 @@
             if(auth) {
                 // We still sign in anonymously to fulfill the security rules requirement
                 signInAnonymously(auth).then(() => {
+                    closeIdentityModal();
                     updateUIBasedOnIdentity();
                     if (inputNameElement) inputNameElement.value = '';
                     showStatus('success', `Welcome ${userName}! You are logged in as a Referee.`);
@@ -498,9 +610,10 @@
                     showStatus('danger', 'Failed to authenticate. Try again.');
                 });
             } else {
+                 closeIdentityModal();
                  updateUIBasedOnIdentity();
                  if (inputNameElement) inputNameElement.value = '';
-                 showStatus('warning', `Welcome ${userName}. Firebase is initializing. Try again in a moment.`);
+                 showStatus('warning', `Welcome ${userName}. Firebase failed. Using local storage.`);
                  setupDataListener(); // Try to load local data immediately
             }
 
@@ -515,6 +628,7 @@
                 userName = ADMIN_NAME;
                 userRole = 'admin';
                 
+                closeIdentityModal();
                 updateUIBasedOnIdentity(); 
                 
                 if (isDbReady) {
@@ -523,13 +637,7 @@
                     showStatus('warning', 'Admin login successful. Database failed (Permissions). Using local storage fallback.');
                 }
                 
-                // Automatically open the data panel for the admin after login
-                const details = document.getElementById('admin-panel-details');
-                const icon = document.getElementById('admin-toggle-icon');
-                if (details) details.classList.remove('hidden');
-                if (icon) icon.textContent = '−'; 
-                
-                setupDataListener(); // Refresh data listener after login
+                setupDataListener(); 
 
             } else {
                 showStatus('danger', 'Invalid admin credentials.');
@@ -541,20 +649,38 @@
             userName = '';
             userRole = 'none';
             // Sign out of firebase auth if possible
-            if (auth) auth.signOut();
+            if (auth) signOut(auth);
             updateUIBasedOnIdentity();
             showStatus('warning', 'Logged out.');
             setupDataListener(); // Re-render as logged out
         };
+        
+        window.openBulkLoadModal = function() {
+            if (userRole !== 'admin') return showStatus('danger', 'Admin rights required.');
+            closeIdentityModal();
+            const modalBackdrop = document.getElementById('bulk-load-modal-backdrop');
+            if (modalBackdrop) {
+                 modalBackdrop.classList.add('show');
+                 modalBackdrop.style.display = 'flex';
+            }
+        }
+        
+        window.closeBulkLoadModal = function() {
+            const modalBackdrop = document.getElementById('bulk-load-modal-backdrop');
+            if (modalBackdrop) {
+                 modalBackdrop.classList.remove('show');
+                 setTimeout(() => {
+                     modalBackdrop.style.display = 'none';
+                 }, 300);
+            }
+        }
+
 
         // --- Core Firebase Setup ---
 
         async function initFirebase() {
-            const loadingText = document.getElementById('loading-text');
-
             if (!Object.keys(rawFirebaseConfig).length || !rawFirebaseConfig.projectId) {
                 console.error("Firebase config is invalid or missing. Cannot proceed with data ops.");
-                if (loadingText) loadingText.innerHTML = '❌ ERROR: Firebase config is missing or invalid. Data cannot be loaded or saved.';
                 isDbReady = false;
                 updateUIBasedOnIdentity();
                 setupDataListener(); // Attempt local load
@@ -569,28 +695,25 @@
                 isDbReady = true;
                 console.log("Firebase Step 2: App and services initialized successfully.");
 
-                if (loadingText) loadingText.textContent = 'Awaiting Authentication...';
                 
                 // 3. Authenticate
-                let userLoggedIn = false;
                 if (initialAuthToken) {
                     console.log("Firebase Step 3a: Signing in with Custom Token...");
-                    const credential = await signInWithCustomToken(auth, initialAuthToken);
-                    userLoggedIn = true;
-                    console.log("Firebase Step 4: Authentication complete. User UID:", credential.user.uid);
+                    await signInWithCustomToken(auth, initialAuthToken);
                 } else {
                     console.log("Firebase Step 3b: Signing in Anonymously...");
                     await signInAnonymously(auth);
-                    userLoggedIn = true;
                 }
                 
                 // 4. Set up Auth State Listener (Crucial for starting data ops)
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
-                        // Listener set up is handled here, but the data listener itself checks isDbReady
+                        console.log("Firebase Auth State: Active.");
                         setupDataListener();
                     } else {
-                        console.log("Firebase Step 4: User logged out or auth failed.");
+                        console.log("Firebase Auth State: No user (anon) or signed out.");
+                        // Only reset data listener if we are in the Firebase path
+                        if (isDbReady) setupDataListener(); 
                     }
                 });
 
@@ -618,50 +741,64 @@
             let fixturesToLoad = parseFixturesText(pasteText || '');
             
             if (fixturesToLoad.length === 0) {
-                return showStatus('warning', 'Could not parse any fixtures. Check your paste format or ensure all fixtures have two teams (no "bye").');
+                return showStatus('warning', 'Could not parse any 11s fixtures. Check your paste format.');
             }
             
-            console.log(`Successfully parsed ${fixturesToLoad.length} fixtures from input.`);
+            closeBulkLoadModal();
+            console.log(`Successfully parsed ${fixturesToLoad.length} 11s fixtures from input.`);
             const pasteArea = document.getElementById('fixtures-paste-area');
             if (pasteArea) pasteArea.value = '';
 
-            toggleAdminPanel(); 
-
             // --- DATABASE ATTEMPT (Primary) ---
             if (isDbReady && db) {
-                showStatus('warning', `Parsed ${fixturesToLoad.length} valid fixtures. Attempting persistent database ingestion...`);
+                showStatus('info', `Parsed ${fixturesToLoad.length} valid 11s fixtures. Attempting database ingestion...`);
 
                 const fixturesCollection = collection(db, FIRES_COLLECTION_PATH);
                 const batch = writeBatch(db);
                 
                 try {
-                    // 1. Delete all existing fixtures 
+                    // 1. Delete all existing 11s fixtures (keep night shifts if possible)
                     const snapshot = await getDocs(query(fixturesCollection));
                     snapshot.docs.forEach(docSnapshot => {
-                        batch.delete(docSnapshot.ref);
+                        // Only delete non-night-shift items if they exist
+                        if (!docSnapshot.data().isNightShift) {
+                             batch.delete(docSnapshot.ref);
+                        }
                     });
 
-                    // 2. Add new fixtures
+                    // 2. Add new 11s fixtures
                     fixturesToLoad.forEach(fixture => {
                         const fixtureRef = doc(fixturesCollection);
                         
-                        // Use Firestore ID for persistence
                         const newFixture = {
                             ...fixture,
                             id: fixtureRef.id, 
+                            isNightShift: false, // Ensure this is set for new 11s fixtures
                             createdAt: serverTimestamp(),
                             updatedAt: serverTimestamp(),
                         };
                         batch.set(fixtureRef, newFixture);
                     });
 
+                    // 3. Ensure all Night Shifts are present (set/update them)
+                    NIGHT_SHIFTS.forEach(shift => {
+                        const shiftRef = doc(fixturesCollection, shift.id);
+                        // We use set with merge: true to avoid overwriting volunteers/assignedRef
+                         batch.set(shiftRef, {
+                            ...shift, 
+                            volunteers: [],
+                            assignedRef: null,
+                            status: 'open',
+                            updatedAt: serverTimestamp()
+                         }, { merge: true });
+                    });
+                    
                     await batch.commit();
-                    showStatus('success', `✅ Successfully loaded and activated ${fixturesToLoad.length} new fixtures. They are now live and shared!`);
+                    showStatus('success', `✅ Successfully loaded and activated ${fixturesToLoad.length} new 11s fixtures.`);
                     return; // EXIT successful database path
 
                 } catch (error) {
                     console.error("Database Write Failed:", error);
-                    // Fall through to local storage if write fails (e.g., due to permissions)
                     isDbReady = false; // Mark as failed for future checks
                     showStatus('danger', `Data Save Failed: ${error.message}. Falling back to LOCAL STORAGE.`);
                     updateUIBasedOnIdentity(); 
@@ -669,32 +806,55 @@
             } 
 
             // --- LOCAL STORAGE FALLBACK (Secondary) ---
-            console.log(`Fallback: Saving ${fixturesToLoad.length} fixtures to local storage.`);
-            saveFixturesLocal(fixturesToLoad);
             
-            // Re-render the UI with the locally saved data
-            const loadingIndicator = document.getElementById('loading-indicator');
-            if (loadingIndicator) loadingIndicator.classList.add('hidden'); 
-            renderFixtures(fixturesToLoad);
-            showStatus('warning', `⚠️ Fixtures loaded LOCALLY. Data is not persistent or shared across users/sessions.`);
+            // Merge new 11s fixtures with existing night shifts in local storage (if they exist)
+            const existingLocal = loadFixturesLocal().filter(f => f.isNightShift);
+            const mergedLocal = [...fixturesToLoad, ...existingLocal];
+            
+            // Ensure all night shifts are present in the local cache
+            NIGHT_SHIFTS.forEach(shift => {
+                if (!mergedLocal.some(f => f.id === shift.id)) {
+                    mergedLocal.push({...shift, volunteers: [], assignedRef: null, status: 'open'});
+                }
+            });
+
+            saveFixturesLocal(mergedLocal);
+            setupDataListener();
+            showStatus('warning', `⚠️ Fixtures loaded LOCALLY. Data is not persistent or shared.`);
         };
 
         // --- Data Listener and UI Rendering (Refactored for Local Fallback) ---
         
         function setupDataListener() {
             const loadingIndicator = document.getElementById('loading-indicator');
-            if (loadingIndicator) loadingIndicator.classList.remove('hidden');
+            if (loadingIndicator) {
+                loadingIndicator.classList.remove('hidden');
+                document.getElementById('loading-text').textContent = 'Loading schedule...';
+            }
+            document.getElementById('night-shifts-loading').classList.remove('hidden');
+
 
             // --- LOCAL STORAGE PATH ---
             if (!isDbReady || !db) {
-                const fixtures = loadFixturesLocal();
-                console.log(`Using Local Storage: Loaded ${fixtures.length} fixtures.`);
-                if (loadingIndicator) loadingIndicator.classList.add('hidden');
-                renderFixtures(fixtures);
-                if (fixtures.length === 0 && userName) {
-                    const loadingText = document.getElementById('loading-text');
-                    if (loadingText) loadingText.innerHTML = '⚠️ Schedule empty. Admin must load fixtures.';
+                // Merge 11s fixtures with required night shifts
+                const local11s = loadFixturesLocal().filter(f => !f.isNightShift);
+                let localShifts = loadFixturesLocal().filter(f => f.isNightShift);
+
+                // Ensure all night shifts are present even if local storage was empty
+                NIGHT_SHIFTS.forEach(shiftTemplate => {
+                    if (!localShifts.some(s => s.id === shiftTemplate.id)) {
+                         localShifts.push({...shiftTemplate, volunteers: [], assignedRef: null, status: 'open'});
+                    }
+                });
+
+                allFixturesCache = [...local11s, ...localShifts];
+                console.log(`Using Local Storage: Loaded ${allFixturesCache.length} total fixtures.`);
+                if (loadingIndicator) {
+                    loadingIndicator.classList.add('hidden');
+                    document.getElementById('loading-text').innerHTML = '⚠️ Using local storage. Data is **NOT** persistent or shared.';
                 }
+                
+                renderAllData();
                 return; // EXIT local storage path
             }
 
@@ -712,10 +872,9 @@
                     allFixtures.push({ id: doc.id, ...doc.data() });
                 });
                 
-                // Sort chronologically in memory (to avoid index issues)
-                allFixtures.sort((a, b) => a.dateSortable - b.dateSortable);
+                allFixturesCache = allFixtures;
+                renderAllData();
 
-                renderFixtures(allFixtures);
             }, (error) => {
                 console.error("Firestore listen failed:", error);
                 
@@ -730,173 +889,252 @@
                 showStatus('danger', errorMessage);
             });
         }
+        
+        function renderAllData() {
+            // RENDER Night Shifts and 11s Fixtures
+            const allShifts = allFixturesCache.filter(f => f.isNightShift);
+            const all11s = allFixturesCache.filter(f => !f.isNightShift);
 
-        function renderFixtures(allFixtures) {
-            const upcomingList = document.getElementById('upcoming-fixtures-list');
-            if (!upcomingList) return; 
+            renderNightShifts(allShifts);
             
-            upcomingList.innerHTML = '';
+            // Populate both Upcoming and My Assignments tabs
+            const upcomingFixtures = all11s.sort((a, b) => (a.dateSortable || 0) - (b.dateSortable || 0));
+            const myAssignments = allFixturesCache.filter(f => f.assignedRef === userName);
+            
+            renderScheduleList('upcoming-fixtures-list', upcomingFixtures, true);
+            renderScheduleList('my-assignments-list', myAssignments, false);
+            
+            // Update My Assignments Tab Count
+            const assignmentsCount = document.getElementById('my-assignments-count');
+            if(assignmentsCount) assignmentsCount.textContent = myAssignments.length.toString();
+            
+            // Ensure correct tab is displayed
+            setActiveTab(activeTab);
+        }
+        
+        function setActiveTab(tabName) {
+            activeTab = tabName;
+            const tabs = ['upcoming', 'my-assignments'];
+
+            tabs.forEach(tab => {
+                const button = document.getElementById(`tab-${tab}`);
+                const content = document.getElementById(`content-${tab}`);
+                
+                if (button && content) {
+                    if (tab === tabName) {
+                        button.className = 'tab-button active-tab';
+                        content.classList.remove('hidden');
+                    } else {
+                        button.className = 'tab-button inactive-tab';
+                        content.classList.add('hidden');
+                    }
+                }
+            });
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initial style setup for tabs (can't be done in static HTML easily)
+            const style = document.createElement('style');
+            style.textContent = `
+                .tab-button {
+                    padding: 0.75rem 1.5rem;
+                    font-weight: 600;
+                    border-radius: 0.5rem 0.5rem 0 0;
+                    margin-right: 0.5rem;
+                    transition: all 0.2s;
+                }
+                .active-tab {
+                    background-color: #ffffff;
+                    color: #1f2937;
+                    border: 1px solid #d1d5db;
+                    border-bottom-color: #ffffff;
+                    margin-bottom: -1px;
+                }
+                .inactive-tab {
+                    background-color: #f3f4f6;
+                    color: #6b7280;
+                    border: 1px solid transparent;
+                    border-bottom-color: #d1d5db;
+                }
+                .inactive-tab:hover {
+                    background-color: #e5e7eb;
+                }
+            `;
+            document.head.appendChild(style);
+            setActiveTab('upcoming'); // Initialize tab visibility
+
+        });
+
+        function renderNightShifts(shifts) {
+            const list = document.getElementById('night-shifts-list');
+            if (!list) return;
+            
+            list.innerHTML = '';
+            document.getElementById('night-shifts-loading').classList.add('hidden');
+
+
+            if (shifts.length === 0) {
+                 list.innerHTML = `<p class="text-center py-4 text-gray-500 col-span-full">No Night Shifts defined or loaded.</p>`;
+                 return;
+            }
+            
+            shifts.forEach(fixture => {
+                const card = createFixtureCard(fixture);
+                // Night shifts need a special class
+                card.classList.add('night-shift-card');
+                list.appendChild(card);
+            });
+        }
+
+        function renderScheduleList(containerId, fixtures, filterPassed) {
+            const container = document.getElementById(containerId);
+            if (!container) return; 
             
             const now = new Date().getTime();
             let currentGroupedDate = null;
             let fixtureCount = 0;
+            
+            container.innerHTML = '';
 
-            allFixtures.forEach(fixture => {
-                if (!fixture.home || !fixture.away || !fixture.dateSortable || !fixture.dateFormatted) {
-                     return; 
-                }
+            fixtures.forEach(fixture => {
+                if (filterPassed && fixture.dateSortable && fixture.dateSortable < now) return;
+                
+                // Only render 11s fixtures in this list (shifts are separate)
+                if (fixture.isNightShift && containerId !== 'my-assignments-list') return;
 
-                if (fixture.dateSortable < now) return;
                 fixtureCount++;
                 
-                const dateHeaderKey = fixture.dateFormatted;
+                const dateHeaderKey = fixture.dateFormatted || fixture.date;
                 
-                // --- Date Grouping Logic ---
-                if (dateHeaderKey !== currentGroupedDate) {
+                // --- Date Grouping Logic for 11s Fixtures ---
+                if (!fixture.isNightShift && dateHeaderKey !== currentGroupedDate) {
                     currentGroupedDate = dateHeaderKey;
                     const dateHeader = document.createElement('h3');
                     dateHeader.className = "text-xl font-bold text-gray-800 mt-6 mb-3 p-2 bg-gray-200 rounded-lg shadow-inner";
                     dateHeader.textContent = currentGroupedDate;
-                    upcomingList.appendChild(dateHeader);
-                }
-
-                const card = document.createElement('div');
-                const volunteerCount = fixture.volunteers ? fixture.volunteers.length : 0;
-                const isVolunteer = userName && fixture.volunteers && fixture.volunteers.includes(userName);
-                
-                let baseClasses = "fixture-card rounded-xl shadow-md overflow-hidden transition duration-300 ";
-                let teamClasses = "text-base font-semibold truncate ";
-                let actionHtml = '';
-                let statusBadge = '';
-
-                // --- Card Styling and Status ---
-                if (fixture.status === 'assigned') {
-                    baseClasses += ' bg-green-50 border-l-4 border-green-500';
-                    statusBadge = `<span class="text-sm font-bold text-green-700">ASSIGNED</span>`;
-                    teamClasses += ' text-gray-800';
-                } else if (isVolunteer) {
-                     baseClasses += ' bg-yellow-50 border-l-4 border-yellow-500 hover:shadow-lg';
-                     statusBadge = `<span class="text-sm font-bold text-yellow-700">APPLIED</span>`;
-                     teamClasses += ' text-gray-800';
-                } else {
-                    // Open and not volunteered
-                    baseClasses += ' bg-white border-l-4 border-red-500 hover:shadow-xl';
-                    teamClasses += ' text-gray-900';
-                    statusBadge = `<span class="text-sm font-bold text-red-700">OPEN (${volunteerCount})</span>`;
-                }
-
-                // --- Action Content (Admin vs Referee) ---
-                
-                // 1. Admin View: Card is clickable to open modal
-                if (userRole === 'admin') {
-                    // Safely stringify volunteers array
-                    const volunteersJson = JSON.stringify(fixture.volunteers || []);
-
-                    card.classList.add('cursor-pointer'); 
-                    card.setAttribute('onclick', `openAssignmentModal('${fixture.id}', '${fixture.home.replace(/'/g, "\\'")}', '${fixture.away.replace(/'/g, "\\'")}', '${dateHeaderKey.replace(/'/g, "\\'")}', '${fixture.time.replace(/'/g, "\\'")}', '${volunteersJson.replace(/'/g, "\\'")}', '${fixture.assignedRef ? fixture.assignedRef.replace(/'/g, "\\'") : ''}')`);
-
-                    if (fixture.status === 'open') {
-                         actionHtml = `
-                            <div class="p-2 text-center text-sm">
-                                <span class="font-bold text-red-600">${volunteerCount} <span class="hidden sm:inline">Volunteer(s)</span></span>
-                                <p class="text-xs text-gray-500 mt-1">Click to Assign</p>
-                            </div>`;
-                    } else { 
-                        // Assigned match: Show assigned ref and clear button
-                        actionHtml = `
-                            <div class="p-2 text-center text-xs space-y-1">
-                                <p class="font-bold text-green-600 truncate">${fixture.assignedRef}</p>
-                                <button onclick="event.stopPropagation(); handleUnassign('${fixture.id}')" class="text-xs text-red-500 hover:text-red-700 underline">Clear</button>
-                            </div>`;
-                    }
-                } 
-                // 2. Referee View: Volunteer/Cancel button
-                else if (userName && userRole === 'referee') {
-                    if (fixture.status === 'assigned') {
-                        actionHtml = `<div class="p-2 text-center text-sm text-green-600 font-bold">Assigned to: ${fixture.assignedRef}</div>`;
-                    } else {
-                        const actionClass = isVolunteer ? 'bg-red-500 hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700';
-                        const actionText = isVolunteer ? 'Cancel Application' : 'Apply Now';
-                        const actionState = isVolunteer ? 'false' : 'true'; 
-
-                        actionHtml = `
-                            <button onclick="handleVolunteer(event, '${fixture.id}', ${actionState})" class="w-full h-full text-white p-2 font-semibold text-sm ${actionClass} transition duration-150">
-                                ${actionText}
-                            </button>`;
-                    }
-
-                } else {
-                    // Logged out
-                    actionHtml = `<div class="p-2 text-center text-sm text-gray-500">${fixture.status === 'assigned' ? 'Assigned' : 'Login to Apply'}</div>`;
+                    container.appendChild(dateHeader);
                 }
                 
-                card.className = baseClasses;
-                card.innerHTML = `
-                    <!-- Main Fixture Details -->
-                    <div class="fixture-main-content">
-                        <!-- Time -->
-                        <div class="flex flex-col flex-shrink-0 w-16 text-center">
-                            <span class="text-lg font-bold text-gray-900 leading-none">${fixture.time}</span>
-                            <span class="text-xs font-medium text-gray-500 hidden sm:block">${fixture.date.split(' ').slice(0, 2).join(' ')}</span>
-                        </div>
-                        
-                        <!-- Teams (Primary focus) -->
-                        <div class="flex-grow min-w-0 pr-4">
-                            <p class="${teamClasses}">${fixture.home} vs ${fixture.away}</p>
-                        </div>
-
-                        <!-- Venue & Pitch -->
-                        <div class="flex flex-col flex-shrink-0 w-24 text-right">
-                            <span class="text-sm font-semibold text-gray-700 truncate">${fixture.venue}</span>
-                            <span class="text-xs font-medium text-red-600">Pitch ${fixture.pitch}</span>
-                        </div>
-
-                        <!-- Status Badge (Mobile/Fallback) -->
-                        <div class="flex-shrink-0 block sm:hidden">${statusBadge}</div>
-
-                    </div>
-                    
-                    <!-- Action Area -->
-                    <div class="fixture-action-area">
-                        ${actionHtml}
-                    </div>
-                `;
-                upcomingList.appendChild(card);
+                const card = createFixtureCard(fixture);
+                container.appendChild(card);
             });
             
             if (fixtureCount === 0) {
-                upcomingList.innerHTML = `<p class="text-center py-10 text-gray-500">No upcoming fixtures. Admin needs to load the schedule.</p>`;
+                container.innerHTML = `<p class="text-center py-10 text-gray-500">${containerId === 'upcoming-fixtures-list' ? 'No upcoming 11s fixtures loaded.' : 'You have no confirmed assignments yet.'}</p>`;
             }
         }
 
-        /** Helper to find and update a local fixture object */
-        function updateLocalFixture(matchId, updates) {
-            const fixtures = loadFixturesLocal();
-            const index = fixtures.findIndex(f => f.id === matchId);
-            
-            if (index !== -1) {
-                fixtures[index] = { ...fixtures[index], ...updates };
-                saveFixturesLocal(fixtures);
-                // Immediately update the UI to reflect the change
-                renderFixtures(fixtures.sort((a, b) => a.dateSortable - b.dateSortable));
-            }
+        /** Creates and returns the full HTML card element for a fixture/shift */
+        function createFixtureCard(fixture) {
+             const card = document.createElement('div');
+             const volunteerCount = fixture.volunteers ? fixture.volunteers.length : 0;
+             const isVolunteer = userName && fixture.volunteers && fixture.volunteers.includes(userName);
+             
+             let baseClasses = "fixture-card overflow-hidden transition duration-300 ";
+             let teamClasses = "text-base font-semibold truncate ";
+             let actionHtml = '';
+             let statusBadge = '';
+             
+             const matchTitle = fixture.isNightShift ? `${fixture.home} (${fixture.away})` : `${fixture.home} vs ${fixture.away}`;
+             const matchDetails = fixture.isNightShift ? `${fixture.time} - ${fixture.venue}` : `${fixture.time} | ${fixture.venue} P${fixture.pitch}`;
+
+             // --- Card Styling and Status ---
+             if (fixture.status === 'assigned') {
+                 baseClasses += ' bg-green-50 border-l-4 border-green-500';
+                 statusBadge = `<span class="text-sm font-bold text-green-700">ASSIGNED</span>`;
+                 teamClasses += ' text-gray-800';
+             } else if (isVolunteer) {
+                  baseClasses += ' bg-yellow-50 border-l-4 border-yellow-500 hover:shadow-lg';
+                  statusBadge = `<span class="text-sm font-bold text-yellow-700">APPLIED</span>`;
+                  teamClasses += ' text-gray-800';
+             } else {
+                 // Open and not volunteered
+                 baseClasses += ' bg-white border-l-4 border-red-500 hover:shadow-xl';
+                 teamClasses += ' text-gray-900';
+                 statusBadge = `<span class="text-sm font-bold text-red-700">OPEN (${volunteerCount})</span>`;
+             }
+
+             // --- Action Content (Admin vs Referee) ---
+             const volunteersJson = JSON.stringify(fixture.volunteers || []);
+
+             // 1. Admin View: Card is clickable to open modal
+             if (userRole === 'admin') {
+                 
+                 card.classList.add('cursor-pointer'); 
+                 card.setAttribute('onclick', `openAssignmentModal('${fixture.id}', '${matchTitle.replace(/'/g, "\\'")}', '${matchDetails.replace(/'/g, "\\'")}', '${volunteersJson.replace(/'/g, "\\'")}', '${fixture.assignedRef ? fixture.assignedRef.replace(/'/g, "\\'") : ''}', ${!!fixture.isNightShift}, '${fixture.time || ''}', '${fixture.venue || ''}', '${fixture.pitch || ''}')`);
+
+                 if (fixture.status === 'open') {
+                      actionHtml = `
+                         <div class="p-2 text-center text-sm">
+                             <span class="font-bold text-red-600">${volunteerCount} <span class="hidden sm:inline">Volunteer(s)</span></span>
+                             <p class="text-xs text-gray-500 mt-1">Click to Assign</p>
+                         </div>`;
+                 } else { 
+                     // Assigned match: Show assigned ref and clear button
+                     actionHtml = `
+                         <div class="p-2 text-center text-xs space-y-1">
+                             <p class="font-bold text-green-600 truncate">${fixture.assignedRef}</p>
+                             <button onclick="event.stopPropagation(); handleUnassign('${fixture.id}')" class="text-xs text-red-500 hover:text-red-700 underline">Clear</button>
+                         </div>`;
+                 }
+             } 
+             // 2. Referee View: Volunteer/Cancel button
+             else if (userName && userRole === 'referee') {
+                 if (fixture.status === 'assigned') {
+                     actionHtml = `<div class="p-2 text-center text-sm text-green-600 font-bold truncate">Assigned to: ${fixture.assignedRef}</div>`;
+                 } else {
+                     const actionClass = isVolunteer ? 'bg-red-500 hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700';
+                     const actionText = isVolunteer ? 'Cancel Application' : 'Apply Now';
+                     const actionState = isVolunteer ? 'false' : 'true'; 
+
+                     actionHtml = `
+                         <button onclick="handleVolunteer(event, '${fixture.id}', ${actionState})" class="w-full h-full text-white p-2 font-semibold text-sm ${actionClass} transition duration-150 rounded-b-xl sm:rounded-none">
+                             ${actionText}
+                         </button>`;
+                 }
+
+             } else {
+                 // Logged out
+                 actionHtml = `<div class="p-2 text-center text-sm text-gray-500">${fixture.status === 'assigned' ? 'Assigned' : 'Login to Apply'}</div>`;
+             }
+             
+             card.className = baseClasses + (fixture.isNightShift ? ' night-shift-card' : '');
+             card.innerHTML = `
+                 <!-- Main Fixture Details -->
+                 <div class="fixture-main-content">
+                     <!-- Time/Day -->
+                     <div class="flex flex-col flex-shrink-0 w-16 text-center">
+                         <span class="text-lg font-bold text-gray-900 leading-none">${fixture.isNightShift ? fixture.date : fixture.time}</span>
+                         <span class="text-xs font-medium text-gray-500 hidden sm:block">${fixture.isNightShift ? fixture.venue : (fixture.dateFormatted || fixture.date).split(' ')[0]}</span>
+                     </div>
+                     
+                     <!-- Teams (Primary focus) -->
+                     <div class="flex-grow min-w-0 pr-4">
+                         <p class="${teamClasses}">${matchTitle}</p>
+                         <p class="text-xs text-gray-500">${matchDetails}</p>
+                     </div>
+
+                     <!-- Status Badge (Mobile/Fallback) -->
+                     <div class="flex-shrink-0 block sm:hidden">${statusBadge}</div>
+
+                 </div>
+                 
+                 <!-- Action Area -->
+                 <div class="fixture-action-area">
+                     ${actionHtml}
+                 </div>
+             `;
+             return card;
         }
 
 
-        // --- Admin Assignment Modal Logic (Retained) ---
+        // --- Admin Assignment Modal Logic ---
 
-        window.openAssignmentModal = function(matchId, home, away, date, time, volunteersJson, assignedRef) {
+        window.openAssignmentModal = function(matchId, title, details, volunteersJson, assignedRef, isNightShift, currentTime, currentVenue, currentPitch) {
             if (userRole !== 'admin') return;
 
-            // FIX: Volunteers must be parsed safely
             let volunteers;
-            try {
-                // Replace escaped single quotes and then parse
-                volunteers = JSON.parse(volunteersJson.replace(/\\'/g, "'"));
-            } catch (e) {
-                console.error("Failed to parse volunteers JSON:", e);
-                volunteers = [];
-            }
+            try { volunteers = JSON.parse(volunteersJson.replace(/\\'/g, "'")); } catch (e) { volunteers = []; }
 
 
             const modalBackdrop = document.getElementById('admin-assignment-modal-backdrop');
@@ -905,17 +1143,25 @@
             const listContainer = document.getElementById('volunteer-list-container');
             const matchIdInput = document.getElementById('modal-match-id');
             const assignButton = document.getElementById('assign-button');
+            const editSection = document.getElementById('admin-edit-section');
 
-            if (!modalBackdrop || !titleElement || !detailsElement || !listContainer || !matchIdInput || !assignButton) {
-                console.error("Modal elements not found. Cannot open modal.");
-                return;
-            }
-
-            titleElement.textContent = `${home} vs ${away}`;
-            detailsElement.textContent = `${date} at ${time}`;
+            titleElement.textContent = title;
+            detailsElement.textContent = details;
             matchIdInput.value = matchId;
             listContainer.innerHTML = ''; 
+            
+            // --- Quick Edit Section Setup (Only for 11s Fixtures) ---
+            if (!isNightShift) {
+                editSection.classList.remove('hidden');
+                document.getElementById('edit-time').value = currentTime;
+                document.getElementById('edit-venue').value = currentVenue;
+                document.getElementById('edit-pitch').value = currentPitch;
+            } else {
+                editSection.classList.add('hidden');
+            }
 
+
+            // --- Volunteer List Setup ---
             if (assignedRef) {
                  listContainer.innerHTML = `<p class="font-bold text-green-600">Currently Assigned: ${assignedRef}</p>`;
                  assignButton.disabled = true;
@@ -926,7 +1172,6 @@
                 assignButton.textContent = 'No Volunteers';
             } else {
                 volunteers.forEach(name => {
-                    // Sanitize name for use in IDs
                     const safeName = name.replace(/[^a-z0-9]/gi, '_'); 
                     const radioId = `ref-${safeName}`; 
                     listContainer.innerHTML += `
@@ -971,20 +1216,23 @@
             }
             const targetRefName = selectedRefElement.value;
 
+            const updates = {
+                assignedRef: targetRefName,
+                status: 'assigned',
+            };
+
             // --- FIREBASE PATH ---
             if (isDbReady && db) {
                 const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
                 try {
                     await updateDoc(matchRef, {
-                        assignedRef: targetRefName,
-                        status: 'assigned',
+                        ...updates,
                         updatedAt: serverTimestamp()
                     });
                     closeAssignmentModal();
-                    return showStatus('success', `✅ ${targetRefName} ASSIGNED to match! Schedule updated.`);
+                    return showStatus('success', `✅ ${targetRefName} ASSIGNED to match!`);
                 } catch(e) {
                     console.error("Assignment failed (Database):", e);
-                    // Fall through to local storage update on failure
                     isDbReady = false;
                     showStatus('danger', 'Database write failed. Falling back to local storage update.');
                     updateUIBasedOnIdentity();
@@ -993,33 +1241,102 @@
 
             // --- LOCAL STORAGE PATH ---
             updateLocalFixture(matchId, {
-                assignedRef: targetRefName,
-                status: 'assigned',
-                updatedAt: new Date().getTime() // Use local timestamp for local updates
+                ...updates,
+                updatedAt: new Date().getTime()
             });
             closeAssignmentModal();
             showStatus('success', `✅ ${targetRefName} ASSIGNED locally.`);
         };
-
-        // --- Referee Action: Volunteer/Cancel (Refactored for Local Fallback) ---
-        window.handleVolunteer = async function(event, matchId, isVolunteering) {
-            event.stopPropagation(); 
+        
+        window.handleQuickEdit = async function() {
+            if (userRole !== 'admin') return showStatus('danger', 'Only administrators can edit details.');
             
-            if (!userName || userRole !== 'referee') return showStatus('danger', 'Please log in as a Referee first.');
+            const matchId = document.getElementById('modal-match-id')?.value;
+            const newTime = document.getElementById('edit-time')?.value;
+            const newVenue = document.getElementById('edit-venue')?.value;
+            const newPitch = document.getElementById('edit-pitch')?.value;
+            
+            if (!matchId || !newTime || !newVenue || !newPitch) {
+                return showStatus('warning', 'All edit fields must be filled.');
+            }
+
+            const fixture = allFixturesCache.find(f => f.id === matchId);
+            if (!fixture || fixture.isNightShift) return showStatus('danger', 'Cannot edit night shift details this way.');
+
+            let newDateSortable = fixture.dateSortable;
+            let newDateFormatted = fixture.dateFormatted;
+
+            try {
+                // Attempt to update the sortable date
+                const datePart = fixture.date.match(/(\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/i)?.[0];
+                if (datePart) {
+                    const dateObj = new Date(`${datePart} ${newTime}`);
+                    newDateSortable = dateObj.getTime();
+                    newDateFormatted = dateFormatter.format(dateObj);
+                }
+            } catch (e) {
+                console.warn("Could not update dateSortable/Formatted with new time:", e);
+                showStatus('warning', 'Could not parse new time format for sorting, saving anyway.');
+            }
+
+
+            const updates = {
+                time: newTime,
+                venue: newVenue,
+                pitch: newPitch,
+                dateSortable: newDateSortable,
+                dateFormatted: newDateFormatted
+            };
 
             // --- FIREBASE PATH ---
             if (isDbReady && db) {
                 const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
                 try {
-                    const updateAction = isVolunteering ? arrayUnion(userName) : arrayRemove(userName);
-                    await updateDoc(matchRef, { 
-                        volunteers: updateAction,
+                    await updateDoc(matchRef, {
+                        ...updates,
                         updatedAt: serverTimestamp()
                     });
-                    return showStatus('success', isVolunteering ? `✅ ${userName}, you have applied for this match!` : '❌ Application cancelled.');
+                    closeAssignmentModal();
+                    return showStatus('success', `✅ Fixture details updated successfully!`);
+                } catch(e) {
+                    console.error("Edit failed (Database):", e);
+                    isDbReady = false;
+                    showStatus('danger', 'Database write failed. Falling back to local storage update.');
+                }
+            }
+            
+            // --- LOCAL STORAGE PATH ---
+            updateLocalFixture(matchId, {
+                ...updates,
+                updatedAt: new Date().getTime()
+            });
+            closeAssignmentModal();
+            showStatus('success', `✅ Fixture details updated locally.`);
+        }
+
+
+        // --- Referee Action: Volunteer/Cancel (Refactored for Local Fallback) ---
+        window.handleVolunteer = async function(event, matchId, isVolunteering) {
+            event.stopPropagation(); 
+            
+            if (!userName || userRole !== 'referee') {
+                showStatus('danger', 'Please log in as a Referee first.');
+                return openIdentityModal();
+            }
+
+            const updates = isVolunteering ? arrayUnion(userName) : arrayRemove(userName);
+
+            // --- FIREBASE PATH ---
+            if (isDbReady && db) {
+                const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
+                try {
+                    await updateDoc(matchRef, { 
+                        volunteers: updates,
+                        updatedAt: serverTimestamp()
+                    });
+                    return showStatus('success', isVolunteering ? `✅ ${userName}, you have applied!` : '❌ Application cancelled.');
                 } catch(e) {
                     console.error("Volunteer update failed (Database):", e);
-                    // Fall through to local storage update on failure
                     isDbReady = false;
                     showStatus('danger', 'Database write failed. Falling back to local storage update.');
                     updateUIBasedOnIdentity();
@@ -1031,15 +1348,17 @@
             const fixture = fixtures.find(f => f.id === matchId);
             
             if (fixture) {
-                const currentVolunteers = fixture.volunteers || [];
+                let currentVolunteers = fixture.volunteers || [];
+                let updatedVolunteers;
+                
                 if (isVolunteering) {
                     if (!currentVolunteers.includes(userName)) {
-                        currentVolunteers.push(userName);
-                        updateLocalFixture(matchId, { volunteers: currentVolunteers });
-                        showStatus('success', `✅ ${userName}, you have applied for this match locally.`);
+                        updatedVolunteers = [...currentVolunteers, userName];
+                        updateLocalFixture(matchId, { volunteers: updatedVolunteers });
+                        showStatus('success', `✅ ${userName}, you have applied locally.`);
                     }
                 } else {
-                    const updatedVolunteers = currentVolunteers.filter(name => name !== userName);
+                    updatedVolunteers = currentVolunteers.filter(name => name !== userName);
                     updateLocalFixture(matchId, { volunteers: updatedVolunteers });
                     showStatus('warning', '❌ Application cancelled locally.');
                 }
@@ -1050,19 +1369,22 @@
         window.handleUnassign = async function(matchId) {
              if (userRole !== 'admin') return showStatus('danger', 'Only administrators can unassign.');
             
+             const updates = {
+                assignedRef: null,
+                status: 'open',
+             };
+
              // --- FIREBASE PATH ---
              if (isDbReady && db) {
                  const matchRef = doc(db, FIRES_COLLECTION_PATH, matchId);
                  try {
                      await updateDoc(matchRef, {
-                        assignedRef: null,
-                        status: 'open',
+                        ...updates,
                         updatedAt: serverTimestamp()
                      });
-                     return showStatus('warning', 'Assignment cleared. Match is now open for volunteering.');
+                     return showStatus('warning', 'Assignment cleared. Match is now open.');
                  } catch(e) {
                      console.error("Unassign failed (Database):", e);
-                     // Fall through to local storage update on failure
                      isDbReady = false;
                      showStatus('danger', 'Database write failed. Falling back to local storage update.');
                      updateUIBasedOnIdentity();
@@ -1071,17 +1393,46 @@
 
              // --- LOCAL STORAGE PATH ---
              updateLocalFixture(matchId, {
-                assignedRef: null,
-                status: 'open',
+                ...updates,
                 updatedAt: new Date().getTime()
              });
              showStatus('warning', 'Assignment cleared locally.');
+        }
+
+        /** Helper to find and update a local fixture object */
+        function updateLocalFixture(matchId, updates) {
+            const fixtures = loadFixturesLocal();
+            const index = fixtures.findIndex(f => f.id === matchId);
+            
+            if (index !== -1) {
+                // Ensure dateSortable and dateFormatted are recalculated if time/date is updated
+                if (updates.time && fixtures[index].date) {
+                    try {
+                        const datePart = fixtures[index].date.match(/(\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/i)?.[0];
+                         if (datePart) {
+                            const dateObj = new Date(`${datePart} ${updates.time}`);
+                            updates.dateSortable = dateObj.getTime();
+                            updates.dateFormatted = dateFormatter.format(dateObj);
+                         }
+                    } catch (e) {
+                        console.warn("Failed to recalculate dateSortable in local update:", e);
+                    }
+                }
+
+                fixtures[index] = { ...fixtures[index], ...updates };
+                saveFixturesLocal(fixtures);
+                // Immediately trigger re-render
+                allFixturesCache = fixtures;
+                renderAllData(); 
+            }
         }
 
         /** Master function to start the app logic. */
         function startApp() {
             updateUIBasedOnIdentity();
             initFirebase();
+            // Ensure tab is set on load
+            setActiveTab('upcoming');
         }
 
         startApp();
