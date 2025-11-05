@@ -47,9 +47,23 @@
             max-width: fit-content;
             cursor: pointer;
         }
-
+        
+        /* Hide expanded content when minimized */
+        .minimized #expanded-content {
+            display: none !important;
+        }
+        
+        /* Show minimized content when minimized */
+        #minimized-content {
+            display: none;
+        }
+        .minimized #minimized-content {
+            display: flex;
+        }
+        
+        /* Styling for all interactive buttons */
         .action-button {
-            transition: background-color 0.2s;
+            transition: background-color 0.2s, transform 0.2s;
         }
 
         .action-button:hover {
@@ -84,34 +98,34 @@
         let app;
         let db;
         let auth;
-        let userId = null;
-        let isAdmin = false; // Simple role check for this demo
-        let isRef = false; // Simple role check for this demo
+        
+        // Local state for role and identity (non-secure)
+        let userName = '';
+        let userId = null; // Will be set by Firebase Auth
+        let userRole = 'Guest'; // 'Guest', 'Standard', 'Referee', 'Admin'
+        
+        const ADMIN_NAME = 'Admin'; 
+        const REF_NAMES = ['Ref1', 'Ref2', 'Ref3']; 
 
-        // Hardcoded IDs for demonstration purposes (replace in real app)
-        const ADMIN_USER_ID = 'admin_user_id'; 
-        const REF_USER_IDS = ['ref_user_1', 'ref_user_2']; // If using anonymous auth, these UIDs will change
-
-        let currentVote = null;
+        // Real-time data storage
+        let currentVote = { '5s': 0, '7s': 0 };
         let currentVolunteers = {};
         let approvedSchedule = [];
+        let fixturesData = [];
 
         // --- DOM Elements ---
         const appContainer = document.getElementById('app-container');
         const loginForm = document.getElementById('login-form');
-        const userIdDisplay = document.getElementById('user-id-display');
-        const loginStatusText = document.getElementById('login-status-text');
-        const contentArea = document.getElementById('main-content-area');
         const identityToolsBox = document.getElementById('identity-tools-box');
         const refToolsArea = document.getElementById('ref-tools-area');
         const fixturesList = document.getElementById('fixtures-list');
         const adminButton = document.getElementById('admin-tools-button');
         const adminModal = document.getElementById('admin-modal');
-        const vote5sBtn = document.getElementById('vote-5s');
-        const vote7sBtn = document.getElementById('vote-7s');
         const voteCountsDisplay = document.getElementById('vote-counts');
         const scheduleModal = document.getElementById('schedule-modal');
         const scheduleList = document.getElementById('schedule-list');
+        const loginInput = document.getElementById('login-name-input');
+        const minimizedNameDisplay = document.getElementById('minimized-name-display');
 
         // --- Utility Functions ---
 
@@ -138,55 +152,35 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
+                // Use session persistence for anonymous login
                 await setPersistence(auth, browserSessionPersistence);
 
+                // Initial sign-in logic
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
-                    // Sign in anonymously if no custom token is provided
                     await signInAnonymously(auth);
                 }
 
-                // Listen for authentication state changes
+                // Listen for authentication state changes (handles anonymous/custom token auth)
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         userId = user.uid;
-                        isAdmin = userId === ADMIN_USER_ID; // Check if the current user is the admin
-                        isRef = REF_USER_IDS.includes(userId); // Check if the current user is a ref
-
-                        // Update UI and start listeners
-                        loginStatusText.textContent = `Logged in as: ${isAdmin ? 'Admin' : isRef ? 'Referee' : 'Standard User'}`;
-                        userIdDisplay.textContent = `UID: ${userId.substring(0, 8)}...`;
-                        appContainer.classList.remove('hidden');
+                        // Check local storage for previous user name to attempt auto-login
+                        const storedName = localStorage.getItem('userName');
+                        if (storedName) {
+                            handleLogin(storedName);
+                        } else {
+                            // If user is authenticated but no role defined, show login form
+                            updateUI('Guest');
+                        }
                         
-                        // Minimize the login box after successful login
-                        identityToolsBox.classList.add('minimized');
-                        
-                        // Start real-time data listeners
+                        // Start real-time data listeners regardless of role
                         setupDataListeners();
-                        
-                        // Show/Hide admin tools
-                        if (isAdmin) {
-                            adminButton.classList.remove('hidden');
-                        } else {
-                            adminButton.classList.add('hidden');
-                        }
-                        
-                        // Show/Hide ref tools
-                        if (isRef) {
-                            refToolsArea.classList.remove('hidden');
-                        } else {
-                            refToolsArea.classList.add('hidden');
-                        }
                     } else {
-                        userId = null;
-                        isAdmin = false;
-                        isRef = false;
-                        appContainer.classList.add('hidden');
-                        identityToolsBox.classList.remove('minimized');
-                        loginStatusText.textContent = 'Not Logged In';
-                        userIdDisplay.textContent = '';
-                        showMessage('Please log in to view content.', true);
+                        // Logged out or failed auth
+                        handleLogout(false);
+                        showMessage('Session ended. Please log in.', true);
                     }
                 });
 
@@ -196,25 +190,113 @@
             }
         }
 
+        // --- IDENTITY & ROLE MANAGEMENT (Non-secure) ---
+
+        window.handleLoginSubmit = (event) => {
+            event.preventDefault();
+            const name = loginInput.value.trim();
+            if (name) {
+                handleLogin(name);
+            }
+        };
+
+        function handleLogin(name) {
+            name = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(); // Normalize case
+            userName = name;
+            localStorage.setItem('userName', userName);
+            
+            if (userName === ADMIN_NAME) {
+                userRole = 'Admin';
+            } else if (REF_NAMES.includes(userName)) {
+                userRole = 'Referee';
+            } else {
+                userRole = 'Standard';
+            }
+            
+            updateUI(userRole);
+            showMessage(`Welcome, ${userName}! Logged in as: ${userRole}`);
+            identityToolsBox.classList.add('minimized');
+            loginInput.value = ''; // Clear input after login
+        }
+
+        window.handleLogout = async (doFirebaseLogout = true) => {
+            if (doFirebaseLogout && auth.currentUser) {
+                 // Sign out of the anonymous/custom auth, forcing a new session next time
+                await signOut(auth);
+                // The onAuthStateChanged listener will handle the UI update
+            }
+            
+            // Clear local role state
+            userName = '';
+            localStorage.removeItem('userName');
+            userRole = 'Guest';
+            updateUI(userRole);
+            identityToolsBox.classList.classList.remove('minimized');
+            if (doFirebaseLogout) showMessage('Successfully logged out.');
+        };
+
+        function updateUI(role) {
+            minimizedNameDisplay.textContent = userName ? `${userName} (${role})` : 'Log In';
+            appContainer.classList.toggle('hidden', role === 'Guest');
+            
+            // Admin Tools
+            adminButton.classList.toggle('hidden', role !== 'Admin');
+            
+            // Referee Tools
+            refToolsArea.classList.toggle('hidden', role !== 'Referee');
+
+            // Identity Box view switch
+            const isLogged = role !== 'Guest';
+            document.getElementById('expanded-content').innerHTML = `
+                <h2 class="text-xl font-bold text-primary-blue border-b pb-2 mb-4">${isLogged ? 'My Identity' : 'Log In'}</h2>
+                ${isLogged ? 
+                    `<p class="text-sm text-gray-600">Name: <span class="font-semibold text-gray-800">${userName}</span></p>
+                     <p class="text-sm text-gray-600">Role: <span class="font-semibold text-primary-blue">${userRole}</span></p>
+                     <p class="text-xs text-gray-400 mt-1">UID: ${userId.substring(0, 8)}...</p>
+                     <button type="button" onclick="window.handleLogout(true);" class="action-button w-full bg-red-500 text-white py-2 rounded-lg font-semibold hover:bg-red-600 mt-4">
+                        Logout
+                     </button>` 
+                    : 
+                    `<form id="login-form-expanded" onsubmit="event.preventDefault(); window.handleLoginSubmit(event);" class="space-y-3">
+                        <input id="login-name-input-expanded" type="text" placeholder="Enter Name (Admin, Ref1, etc.)" class="w-full p-2 border border-gray-300 rounded-lg" value="${loginInput.value}">
+                        <button type="submit" class="action-button w-full bg-primary-blue text-white py-2 rounded-lg font-semibold hover:bg-blue-700">
+                            Log In
+                        </button>
+                    </form>`
+                }
+                ${role === 'Admin' ? `<button id="admin-tools-button-expanded" onclick="window.toggleAdminModal()" class="action-button w-full bg-accent-yellow text-gray-900 py-2 rounded-lg font-semibold hover:bg-yellow-500 mt-2">
+                    Manage Fixtures
+                </button>` : ''}
+            `;
+            // Re-attach event listener for the expanded login form if necessary
+            if (!isLogged) {
+                setTimeout(() => {
+                    const expandedInput = document.getElementById('login-name-input-expanded');
+                    if (expandedInput) {
+                        expandedInput.focus();
+                        expandedInput.addEventListener('input', (e) => loginInput.value = e.target.value); // Sync with hidden input
+                    }
+                }, 50);
+            }
+        }
+
+
         // --- DATA LISTENERS ---
 
         function setupDataListeners() {
             // 1. Fixtures Listener
             onSnapshot(collection(db, getPublicCollectionPath('fixtures')), (snapshot) => {
-                const fixtures = [];
-                snapshot.forEach(doc => {
-                    fixtures.push({ id: doc.id, ...doc.data() });
-                });
-                renderFixtures(fixtures);
+                fixturesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderFixtures(fixturesData);
             }, (error) => {
                 console.error("Error fetching fixtures:", error);
-                showMessage("Could not load fixtures.", true);
+                // Do not show error if app is hidden
+                if (userRole !== 'Guest') showMessage("Could not load fixtures.", true);
             });
 
             // 2. Ref Votes Listener
             onSnapshot(doc(db, getPublicCollectionPath('ref_votes'), 'night_vote'), (docSnap) => {
-                const data = docSnap.exists() ? docSnap.data() : { '5s': 0, '7s': 0 };
-                currentVote = data;
+                currentVote = docSnap.exists() ? docSnap.data() : { '5s': 0, '7s': 0 };
                 renderRefTools();
             }, (error) => {
                 console.error("Error fetching votes:", error);
@@ -232,13 +314,15 @@
                 });
             });
 
-            // 4. Ref Approved Schedule Listener (Private Data)
-            if (isRef && userId) {
-                 onSnapshot(collection(db, getPrivateCollectionPath('ref_schedule')), (snapshot) => {
-                    approvedSchedule = [];
-                    snapshot.forEach(doc => {
-                        approvedSchedule.push({ id: doc.id, ...doc.data() });
-                    });
+            // 4. Ref Approved Schedule Listener (Private Data - Use common path and filter by name)
+            // Simulating a private schedule by using the user's name as a filter key.
+            // In a real app, this would be a private collection path per user ID.
+            if (userId) { // Check for Firebase user ID
+                 onSnapshot(collection(db, getPublicCollectionPath('ref_schedules')), (snapshot) => {
+                    approvedSchedule = snapshot.docs
+                        .map(doc => ({ id: doc.id, ...doc.data() }))
+                        .filter(game => game.refName === userName); // Filter by the locally logged-in name
+                        
                     renderSchedule();
                 }, (error) => {
                     console.error("Error fetching ref schedule:", error);
@@ -254,13 +338,13 @@
                 return;
             }
 
-            // Sort fixtures by time (simple alphabetical for this demo)
+            // Sort fixtures by time
             fixtures.sort((a, b) => (a.time > b.time) ? 1 : -1);
 
             const html = fixtures.map(f => `
                 <div class="flex justify-between items-center p-3 border-b border-gray-200 hover:bg-gray-50 transition">
                     <div class="font-semibold text-lg text-gray-800">${f.time}</div>
-                    <div class="text-gray-600">${f.home} vs ${f.away}</div>
+                    <div class="text-gray-600 flex-1 px-4">${f.home} vs ${f.away}</div>
                     <div class="text-sm font-medium text-primary-blue">${f.location}</div>
                 </div>
             `).join('');
@@ -269,7 +353,7 @@
         }
 
         function renderRefTools() {
-            if (!isRef) return;
+            if (userRole !== 'Referee') return;
 
             // Render Vote Counts
             const totalVotes = (currentVote['5s'] || 0) + (currentVote['7s'] || 0);
@@ -279,38 +363,24 @@
                 <span class="text-primary-blue font-bold">${currentVote['7s'] || 0}</span> for 7s
             `;
 
-            // Style buttons based on current user's vote
-            vote5sBtn.classList.remove('bg-accent-yellow', 'hover:bg-yellow-500');
-            vote7sBtn.classList.remove('bg-accent-yellow', 'hover:bg-yellow-500');
-            
-            // NOTE: To properly check if a user voted, we'd need a separate Firestore doc per user. 
-            // For this demo, we assume the user has not voted or we don't track individual votes.
-            // If we tracked individual votes:
-            /*
-            if (myVote === '5s') {
-                vote5sBtn.classList.add('bg-accent-yellow', 'hover:bg-yellow-500');
-            } else if (myVote === '7s') {
-                vote7sBtn.classList.add('bg-accent-yellow', 'hover:bg-yellow-500');
-            }
-            */
-
             // Render Volunteering Shifts
             const shiftsConfig = [
-                { key: 'mon', label: 'Mon: Boyd Wilson (5:50pm - 10:10pm)' },
-                { key: 'wed_bw', label: 'Wed: Boyd Wilson (5:50pm - 10:10pm)' },
-                { key: 'wed_am', label: 'Wed: Alex Moore (7:20pm - 9:40pm)' },
-                { key: 'tue_hub', label: 'Tue: 5\'s at The Hub (7:00pm - 10:00pm)' },
-                { key: 'thu_tw', label: 'Thu: 5\'s Te Whaea (7:20pm - 9:40pm)' },
+                { key: 'mon', label: "Mon: Boyd Wilson (5:50pm-10:10pm)" },
+                { key: 'wed_bw', label: "Wed: Boyd Wilson (5:50pm-10:10pm)" },
+                { key: 'wed_am', label: "Wed: Alex Moore (7:20pm-9:40pm)" },
+                { key: 'tue_hub', label: "Tue: 5's at The Hub (7:00pm-10:00pm)" },
+                { key: 'thu_tw', label: "Thu: 5's Te Whaea (7:20pm-9:40pm)" },
             ];
             
             const shiftsHtml = shiftsConfig.map(shift => {
-                const volunteered = currentVolunteers[shift.key] && currentVolunteers[shift.key].includes(userId);
+                const volunteers = currentVolunteers[shift.key] || [];
+                const volunteered = volunteers.includes(userName);
                 return `
                     <button id="shift-${shift.key}" 
                             data-shift-key="${shift.key}" 
                             class="ref-shift-btn action-button text-xs py-2 px-3 rounded-full border ${volunteered ? 'volunteered' : 'bg-white hover:bg-gray-100 text-gray-700 border-gray-300'}"
                             onclick="window.toggleVolunteer('${shift.key}')">
-                        ${shift.label} (${currentVolunteers[shift.key] ? currentVolunteers[shift.key].length : 0} volunteered)
+                        ${shift.label} (${volunteers.length} volunteered)
                     </button>
                 `;
             }).join('');
@@ -321,7 +391,7 @@
         function renderSchedule() {
             scheduleList.innerHTML = '';
             if (approvedSchedule.length === 0) {
-                scheduleList.innerHTML = '<p class="text-gray-500 italic">No approved games are currently on your schedule.</p>';
+                scheduleList.innerHTML = '<p class="text-gray-500 italic p-4">No approved games are currently on your schedule.</p>';
                 return;
             }
 
@@ -331,7 +401,7 @@
                 item.innerHTML = `
                     <div class="font-bold text-gray-800">${game.time} - ${game.location}</div>
                     <div class="text-sm text-gray-600">${game.match}</div>
-                    <div class="text-xs text-primary-blue mt-1">Status: Approved by Admin</div>
+                    <div class="text-xs text-primary-blue mt-1">Ref: ${game.refName} | Status: Approved</div>
                 `;
                 scheduleList.appendChild(item);
             });
@@ -341,28 +411,19 @@
         
         // Identity Box Toggle
         window.toggleIdentityBox = () => {
-            identityToolsBox.classList.toggle('minimized');
-        };
-
-        // Logout
-        window.handleLogout = async () => {
-            try {
-                await signOut(auth);
-                showMessage('Successfully logged out.');
-            } catch (error) {
-                console.error("Logout Error:", error);
-                showMessage(`Logout failed: ${error.message}`, true);
+            if (userRole !== 'Guest') { // Only toggle if logged in
+                identityToolsBox.classList.toggle('minimized');
             }
         };
 
         // Ref Voting
         window.handleVote = async (type) => {
-            if (!userId) return;
+            if (userRole !== 'Referee') return;
 
             const voteRef = doc(db, getPublicCollectionPath('ref_votes'), 'night_vote');
             try {
-                // For simplicity, we just increment the global count. 
-                // In a real app, you'd use transactions and a per-user document to prevent double-voting.
+                // Check if user has already voted (simple check based on local data, could be improved)
+                // For simplicity, we just allow multiple votes for the demo
                 const newCount = (currentVote[type] || 0) + 1;
                 await setDoc(voteRef, { [type]: newCount }, { merge: true });
                 showMessage(`Voted for ${type} successfully!`);
@@ -374,20 +435,20 @@
 
         // Ref Volunteering
         window.toggleVolunteer = async (shiftKey) => {
-            if (!userId) return;
+            if (userRole !== 'Referee') return;
 
             const shiftRef = doc(db, getPublicCollectionPath('ref_volunteers'), shiftKey);
             const currentShiftVolunteers = currentVolunteers[shiftKey] || [];
             
             try {
-                if (currentShiftVolunteers.includes(userId)) {
+                if (currentShiftVolunteers.includes(userName)) {
                     // Remove volunteer
-                    const updatedVolunteers = currentShiftVolunteers.filter(id => id !== userId);
+                    const updatedVolunteers = currentShiftVolunteers.filter(name => name !== userName);
                     await updateDoc(shiftRef, { volunteers: updatedVolunteers });
                     showMessage(`Withdrew volunteer offer for shift ${shiftKey}.`);
                 } else {
                     // Add volunteer
-                    const updatedVolunteers = [...currentShiftVolunteers, userId];
+                    const updatedVolunteers = [...currentShiftVolunteers, userName];
                     await setDoc(shiftRef, { volunteers: updatedVolunteers });
                     showMessage(`Volunteered for shift ${shiftKey}!`);
                 }
@@ -401,7 +462,9 @@
         // --- ADMIN HANDLERS ---
 
         window.toggleAdminModal = () => {
-            adminModal.classList.toggle('hidden');
+            if (userRole === 'Admin') {
+                adminModal.classList.toggle('hidden');
+            }
         };
         
         window.closeScheduleModal = () => {
@@ -420,11 +483,10 @@
                 return;
             }
 
-            // Example data structure (Team A vs Team B @ Location, Time)
+            // Example data structure: "Time,Home,Away,Location"
             const lines = fixtureInput.split('\n').filter(line => line.trim() !== '');
             const newFixtures = [];
             
-            // Minimal parsing logic for demonstration: "Time,Home,Away,Location"
             lines.forEach(line => {
                 const parts = line.split(',');
                 if (parts.length >= 4) {
@@ -435,18 +497,16 @@
                         location: parts[3].trim(),
                         status: 'Scheduled'
                     });
-                } else {
-                    showMessage(`Skipping malformed line: ${line}`, true);
                 }
             });
 
             if (newFixtures.length === 0) {
-                showMessage("No valid fixtures found to upload.", true);
+                showMessage("No valid fixtures found to upload. Format: Time,Home,Away,Location", true);
                 return;
             }
 
             try {
-                // 1. Clear existing fixtures (optional, but good for bulk replacement)
+                // 1. Clear existing fixtures
                 const q = query(collection(db, getPublicCollectionPath('fixtures')));
                 const snapshot = await getDocs(q);
                 const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
@@ -460,7 +520,7 @@
 
                 showMessage(`Successfully uploaded and replaced ${newFixtures.length} fixtures!`);
                 textarea.value = '';
-                window.toggleAdminModal(); // Close box on successful upload
+                window.toggleAdminModal();
 
             } catch (error) {
                 console.error("Fixture Upload Error:", error);
@@ -492,37 +552,32 @@
     <!-- Message Container -->
     <div id="message-container" class="fixed top-3 left-1/2 transform -translate-x-1/2 z-[2000] w-full max-w-sm"></div>
 
-    <!-- Identity and Tools Box (Minimizable) -->
-    <div id="identity-tools-box" class="card bg-white shadow-xl flex items-center justify-between minimized border border-primary-blue" onclick="window.toggleIdentityBox()">
-        <div id="minimized-view" class="flex items-center space-x-2 w-full">
-            <svg class="w-6 h-6 text-primary-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            <div class="flex flex-col text-sm font-semibold">
-                <span id="login-status-text" class="text-primary-blue">Initializing...</span>
-                <span id="user-id-display" class="text-xs text-gray-500"></span>
+    <!-- Identity and Tools Box (Minimizable/Expandable) -->
+    <div id="identity-tools-box" class="card bg-white shadow-xl flex items-center justify-between border border-primary-blue/30" onclick="window.toggleIdentityBox()">
+        <!-- Minimized View (Visible when logged in and minimized) -->
+        <div id="minimized-content" class="flex items-center space-x-2 w-full">
+            <svg class="w-6 h-6 text-primary-blue flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <div class="flex flex-col text-sm font-semibold truncate flex-grow">
+                <span id="minimized-name-display" class="text-primary-blue">Log In</span>
             </div>
-            <button id="logout-button" onclick="event.stopPropagation(); window.handleLogout();" class="text-red-500 hover:text-red-700 text-xs font-semibold ml-auto hidden minimized:inline-block">Logout</button>
+            <button onclick="event.stopPropagation(); window.handleLogout(true);" class="text-red-500 hover:text-red-700 text-xs font-semibold ml-2 flex-shrink-0">Logout</button>
         </div>
         
-        <!-- Expanded Login/Tools View (Visible when not minimized) -->
-        <div id="expanded-view" class="minimized:hidden w-full space-y-4">
-            <h2 class="text-xl font-bold text-primary-blue border-b pb-2 mb-4">My Identity & Tools</h2>
-            <form id="login-form" onsubmit="event.preventDefault(); /* Login logic handled by Auth Listener */" class="space-y-3">
-                <p class="text-sm text-gray-600">You are signed in anonymously. UID is your identity.</p>
-                <button type="button" onclick="window.handleLogout();" class="action-button w-full bg-red-500 text-white py-2 rounded-lg font-semibold hover:bg-red-600">
-                    Logout
+        <!-- Expanded Login/Tools View (Visible when logged out or expanded) -->
+        <div id="expanded-content" class="w-full space-y-4">
+            <h2 class="text-xl font-bold text-primary-blue border-b pb-2 mb-4">Log In</h2>
+            <form id="login-form-expanded" onsubmit="event.preventDefault(); window.handleLoginSubmit(event);" class="space-y-3">
+                <input id="login-name-input" type="text" placeholder="Enter Name (Admin, Ref1, etc.)" class="w-full p-2 border border-gray-300 rounded-lg" required>
+                <button type="submit" class="action-button w-full bg-primary-blue text-white py-2 rounded-lg font-semibold hover:bg-blue-700">
+                    Log In
                 </button>
             </form>
-            
-            <div id="admin-tools" class="space-y-3 mt-4">
-                <button id="admin-tools-button" onclick="window.toggleAdminModal()" class="action-button hidden w-full bg-primary-blue text-white py-2 rounded-lg font-semibold hover:bg-blue-700">
-                    Admin: Manage Fixtures
-                </button>
-            </div>
+            <p class="text-xs text-gray-500 mt-2">Use 'Admin', 'Ref1', 'Ref2', or 'Ref3' to access roles.</p>
         </div>
     </div>
 
 
-    <!-- Main Content Container -->
+    <!-- Main Content Container (Hidden until logged in) -->
     <div class="pt-24 pb-12 px-4 sm:px-6 lg:px-8 hidden" id="app-container">
         <div class="max-w-7xl mx-auto">
             <header class="text-center mb-10">
@@ -540,26 +595,26 @@
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                         Night Format Vote
                     </h3>
-                    <div class="flex space-x-4 items-center">
-                        <button id="vote-5s" onclick="window.handleVote('5s')" class="action-button bg-primary-blue text-white py-2 px-6 rounded-lg font-semibold hover:bg-blue-700">
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <button onclick="window.handleVote('5s')" class="action-button bg-primary-blue text-white py-2 px-6 rounded-lg font-semibold hover:bg-blue-700">
                             Vote for 5s Night
                         </button>
-                        <button id="vote-7s" onclick="window.handleVote('7s')" class="action-button bg-primary-blue text-white py-2 px-6 rounded-lg font-semibold hover:bg-blue-700">
+                        <button onclick="window.handleVote('7s')" class="action-button bg-primary-blue text-white py-2 px-6 rounded-lg font-semibold hover:bg-blue-700">
                             Vote for 7s Night
                         </button>
-                        <span id="vote-counts" class="text-sm font-medium ml-4 p-2 rounded-md bg-white"></span>
+                        <span id="vote-counts" class="text-sm font-medium p-2 rounded-md bg-white border border-gray-300"></span>
+                        <button onclick="window.openScheduleModal()" class="action-button bg-accent-yellow text-gray-900 py-2 px-4 rounded-lg font-semibold hover:bg-yellow-500 transition ml-auto">
+                            My Approved Schedule
+                        </button>
                     </div>
                 </div>
 
-                <!-- Schedule & Volunteering -->
-                <div class="flex flex-col md:flex-row md:items-center justify-between">
-                    <h3 class="text-xl font-semibold text-gray-800 mb-3 md:mb-0 flex items-center">
+                <!-- Volunteering Shifts -->
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3 flex items-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h.01M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                        Volunteering Shifts
+                        Volunteer for Shifts
                     </h3>
-                    <button onclick="window.openScheduleModal()" class="action-button bg-accent-yellow text-gray-900 py-2 px-4 rounded-lg font-semibold hover:bg-yellow-500 transition">
-                        My Approved Schedule
-                    </button>
                 </div>
                 
                 <!-- Volunteering Buttons -->
