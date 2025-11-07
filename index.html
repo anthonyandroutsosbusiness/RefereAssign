@@ -9,34 +9,41 @@
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
 
+    /* Core card/flex layout (kept consistent with your site) */
     .fixture-card {
-      transition: all 0.22s cubic-bezier(.2,.9,.2,1);
+      transition: all 0.18s ease;
       box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
       display:flex; flex-direction:column; cursor: default;
     }
     .fixture-main-content { display:flex; align-items:center; flex-grow:1; gap:1.5rem; padding:0.75rem 1rem; }
     .fixture-action-area { padding:0.5rem 1rem; border-top:1px solid #f3f4f6; background:#fff; }
-    .admin-section { background:#ffe0e0; border:2px solid #ef4444; }
-    .modal-backdrop { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:50; display:none; justify-content:center; align-items:center; }
-    .modal-content { max-width:90vw; width:500px; max-height:90vh; overflow-y:auto; transform:scale(0.95); transition:all 0.2s ease; }
-    .modal-backdrop.show .modal-content { transform:scale(1); }
     @media (min-width:640px) {
       .fixture-card { flex-direction:row; height:80px; padding:0; }
       .fixture-main-content { padding:0 1rem; }
       .fixture-action-area { width:150px; border-top:none; border-left:1px solid #f3f4f6; padding:0; height:100%; display:flex; align-items:center; justify-content:center; }
     }
-    .nightshift-card { min-width:140px; max-width:240px; transition:all .25s; }
-    .faded { opacity:0.35; filter:grayscale(0.35); transform:scale(.995); }
-    .panel-collapsed { width:3.5rem !important; opacity:0.85; }
-    /* small responsive tweak for identity panel content when collapsed */
+
+    /* Night shift mini-card style */
+    .nightshift-card { min-width:140px; max-width:240px; transition: all .25s; }
+    .faded { opacity:0.3; filter:grayscale(.6); transform:scale(.995); }
+
+    /* Status colors */
+    .status-pending { background: #fff9db; } /* yellow-ish */
+    .status-approved { background: #ecfdf5; } /* green-ish */
+
+    /* Collapsed control panel */
+    .panel-collapsed { width:3.2rem !important; opacity:0.9; }
     .collapsed-hide { display:none !important; }
   </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8">
 
-  <div id="status-message" class="fixed top-4 left-1/2 -translate-x-1/2 p-3 rounded-xl shadow-xl z-50 hidden transition-all duration-300 transform" style="max-width:90vw;"></div>
+  <div id="status-message" class="fixed top-4 left-1/2 -translate-x-1/2 p-3 rounded-xl shadow-xl z-50 hidden" style="max-width:90vw;"></div>
 
-  <!-- MY IDENTITY & TOOLS PANEL (slightly smaller + collapsible) -->
+  <!-- ----------------------------------------------------------
+       MY IDENTITY & TOOLS PANEL (Right) - small & collapsible
+       Kept functionality; made collapse actual (toggle).
+       ---------------------------------------------------------- -->
   <div id="user-control-panel" class="w-full max-w-sm mx-auto bg-white p-3 rounded-xl shadow-2xl border-t-4 border-red-600 mb-6 sm:mb-0 sm:float-right sm:sticky sm:top-8 transition-all" style="backdrop-filter: blur(1px);">
     <div class="flex items-center justify-between">
       <h2 class="text-lg font-bold text-gray-800">My Identity & Tools</h2>
@@ -48,7 +55,7 @@
     <div id="panel-content" class="mt-2">
       <div id="identity-form" class="space-y-2">
         <h3 class="font-bold text-md text-gray-700">Referee Login</h3>
-        <input type="text" id="referee-name-input" placeholder="Enter Your Full Name" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-sm">
+        <input type="text" id="referee-name-input" placeholder="Enter Your Full Name" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-sm" />
         <div class="flex gap-2">
           <button onclick="handleRefereeLogin()" class="flex-1 bg-indigo-600 text-white p-2 rounded-lg font-semibold hover:bg-indigo-700 text-sm">Login as Referee</button>
           <button onclick="showAdminLoginForm()" class="text-sm text-red-600 hover:text-red-700 p-2">Admin</button>
@@ -57,8 +64,8 @@
 
       <div id="admin-login-form" class="space-y-2 hidden">
         <h3 class="font-bold text-md text-red-700">Admin Login</h3>
-        <input type="email" id="admin-email" value="admin@betterfootball.co.nz" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
-        <input type="password" id="admin-password" value="password" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+        <input type="email" id="admin-email" value="admin@betterfootball.co.nz" class="w-full p-2 border border-gray-300 rounded-lg text-sm" />
+        <input type="password" id="admin-password" value="password" class="w-full p-2 border border-gray-300 rounded-lg text-sm" />
         <div class="flex gap-2">
           <button onclick="handleAdminLogin()" class="flex-1 bg-red-600 text-white p-2 rounded-lg font-semibold hover:bg-red-700 text-sm">Login</button>
           <button onclick="showRefereeLoginForm()" class="text-sm text-gray-600 p-2">Back</button>
@@ -81,13 +88,16 @@
         <div id="admin-panel-details" class="mt-2 pt-2 border-t border-red-400 hidden">
           <p class="text-xs text-gray-700 mb-2">Paste the <strong>EXACT</strong> vertical schedule below. Fixtures with 'bye' will be skipped.</p>
           <textarea id="fixtures-paste-area" rows="4" placeholder="Paste fixture data here..." class="w-full p-2 border border-red-300 rounded-lg text-xs"></textarea>
-          <button onclick="parseAndLoadFixtures()" class="w-full mt-2 bg-red-600 text-white p-2 rounded-lg font-semibold hover:bg-red-700 text-sm">Process and Load Fixtures</button>
+          <div class="flex gap-2 mt-2">
+            <button id="process-paste-btn" onclick="parseAndLoadFixtures()" class="flex-1 bg-red-600 text-white p-2 rounded-lg font-semibold hover:bg-red-700 text-sm">Process and Load Fixtures</button>
+            <button onclick="clearPasteArea()" class="px-3 py-2 border rounded text-sm">Clear</button>
+          </div>
           <p id="db-status-message" class="text-xs font-semibold text-red-700 mt-2 hidden">Attempting to connect to database...</p>
         </div>
       </div>
     </div>
   </div>
-  <!-- END IDENTITY PANEL -->
+  <!-- END CONTROL PANEL -->
 
   <main class="w-full max-w-4xl mx-auto sm:mr-96">
     <header class="text-center mb-5">
@@ -95,7 +105,6 @@
       <p id="ref-greeting" class="text-lg text-gray-600">Please log in to view the schedule.</p>
     </header>
 
-    <!-- APPROVED ASSIGNMENTS (for referees) -->
     <div id="approved-fixtures-container" class="hidden mb-4">
       <h2 class="text-2xl font-bold text-green-700 border-b pb-2 mb-3">Your Approved Assignments</h2>
       <div id="approved-fixtures-list" class="space-y-3 mb-4"></div>
@@ -103,23 +112,29 @@
 
     <h2 class="text-2xl font-bold text-gray-700 border-b pb-2 mb-4">Upcoming Schedule</h2>
 
-    <!-- NIGHT SHIFT SECTION START -->
-    <!-- Static night shifts shown ONLY at the top as cards to apply for -->
+    <!-- ======================================================
+         NIGHT SHIFTS SECTION: TOP-ONLY (Permanent list)
+         Fixed order and titles per your specification.
+         Stored in Firestore with fixed IDs; created automatically
+         if missing. Admin hide => hiddenThisWeek: true
+         Per-shift "Restore Hidden" button appears on each shift
+         for admin only when hidden.
+         ====================================================== -->
     <div id="night-shifts-wrapper" class="mb-6">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-2xl font-bold text-gray-700">5s &amp; 7s Night Shifts</h3>
         <div id="night-shift-admin-controls" class="hidden">
-          <button id="restore-hidden-btn" onclick="restoreHiddenNightShifts()" class="text-sm text-indigo-600 hover:text-indigo-800 hidden">🔁 Restore Hidden Night Shifts</button>
+          <span class="text-sm text-gray-500">Admin controls:</span>
         </div>
       </div>
 
       <div id="night-shifts-container" class="flex flex-wrap gap-3">
-        <!-- rendered by JS -->
+        <!-- Night shift cards rendered by JS -->
       </div>
     </div>
-    <!-- NIGHT SHIFT SECTION END -->
+    <!-- END NIGHT SHIFTS -->
 
-    <!-- ADD FIXTURE SECTION START -->
+    <!-- ADD FIXTURE SECTION (ADMIN INLINE) -->
     <div id="add-fixture-section" class="mb-4 hidden">
       <div class="flex items-center gap-3 mb-2">
         <button id="open-add-fixture-btn" onclick="toggleAddFixtureForm(true)" class="px-3 py-1 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 text-sm">➕ Add Fixture</button>
@@ -141,7 +156,7 @@
         </div>
       </div>
     </div>
-    <!-- ADD FIXTURE SECTION END -->
+    <!-- END ADD FIXTURE -->
 
     <div id="upcoming-fixtures-list" class="space-y-3">
       <div id="loading-indicator" class="text-center text-gray-500 py-10">
@@ -154,872 +169,1087 @@
     </div>
   </main>
 
-  <!-- ADMIN ASSIGNMENT MODAL (unchanged visual) -->
-  <div id="admin-assignment-modal-backdrop" class="modal-backdrop transition-opacity duration-300">
-    <div id="admin-assignment-modal-content" class="modal-content bg-white p-6 rounded-xl shadow-2xl">
-      <h3 class="text-2xl font-bold text-red-600 border-b pb-2 mb-4" id="modal-match-title"></h3>
-      <p class="text-sm text-gray-600 mb-4" id="modal-match-details"></p>
+  <!-- ADMIN ASSIGNMENT MODAL (unchanged visual, used for approving volunteers) -->
+  <div id="admin-assignment-modal-backdrop" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center">
+    <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
+      <h3 id="modal-match-title" class="text-2xl font-bold text-red-600 mb-2"></h3>
+      <p id="modal-match-details" class="text-sm text-gray-600 mb-3"></p>
 
-      <form id="assignment-form" onsubmit="return false;" class="space-y-3">
-        <p class="font-semibold text-gray-700">Select Referee to Assign:</p>
-        <div id="volunteer-list-container" class="bg-gray-100 p-3 rounded-lg max-h-48 overflow-y-auto space-y-2 border"></div>
-        <input type="hidden" id="modal-match-id">
-        <div class="flex justify-end pt-4 space-x-3">
-          <button type="button" onclick="closeAssignmentModal()" class="px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-100 transition">Cancel</button>
-          <button type="submit" onclick="handleFinalAssignment()" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition" disabled id="assign-button">Confirm Assignment</button>
-        </div>
-      </form>
+      <div id="volunteer-list-container" class="bg-gray-100 p-3 rounded-lg max-h-48 overflow-y-auto space-y-2 border mb-4"></div>
+
+      <div class="flex justify-end gap-3">
+        <button onclick="closeAssignmentModal()" class="px-4 py-2 border rounded">Cancel</button>
+        <button id="assign-confirm-btn" onclick="handleFinalAssignment()" class="px-4 py-2 bg-red-600 text-white rounded font-semibold">Confirm Assignment</button>
+      </div>
     </div>
   </div>
 
   <script type="module">
-  // -----------------------------
-  // GLOBAL CONFIG AND CONSTANTS
-  // -----------------------------
-  let rawFirebaseConfig = {};
-  try { rawFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {}; } catch(e){ rawFirebaseConfig = {}; console.error('Bad firebase config', e); }
+    /************************************************************************
+     * Final code: Keeps original copy/paste fixture system and behavior
+     * Adds:
+     *  - Fixed top night shifts (created in Firestore if missing)
+     *  - Night shift volunteer/approve/hide/restore per shift (syncs to Firestore)
+     *  - Inline admin edit/add/delete for 11s fixtures using date/time inputs
+     *  - Colors: pending (yellow), approved (green)
+     *  - Admin disabled when Firestore not available (per your instruction)
+     *
+     * All new blocks are commented clearly. Proceed carefully when editing.
+     ************************************************************************/
 
-  const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-  const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-  const ADMIN_EMAIL = 'admin@betterfootball.co.nz';
-  const ADMIN_PASSWORD = 'password';
-  const ADMIN_NAME = 'BetterFootball Admin';
-  const FIRES_COLLECTION_PATH = `/artifacts/${appId}/public/data/fixtures`;
-  const LOCAL_STORAGE_KEY = `referee-fixtures-${appId}`;
+    // ----- Basic config & constants -----
+    let rawFirebaseConfig = {};
+    try { rawFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {}; } catch (e) { rawFirebaseConfig = {}; console.error('Invalid firebase config'); }
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const INITIAL_AUTH_TOKEN = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-  // Static night shifts
-  const NIGHT_SHIFTS = [
-    { id:'night-boyd-mon', venue:'Boyd Wilson', pitch:'5s', format:'5s', isNightShift:true },
-    { id:'night-hub-5s', venue:'The Hub', pitch:'5s', format:'5s', isNightShift:true },
-    { id:'night-boyd-wed7', venue:'Boyd Wilson', pitch:'7s', format:'7s', isNightShift:true },
-    { id:'night-alex-wed7', venue:'Alex Moore', pitch:'7s', format:'7s', isNightShift:true },
-    { id:'night-teawhaea-thurs5', venue:'Te Whaea', pitch:'5s', format:'5s', isNightShift:true }
-  ];
+    const ADMIN_EMAIL = 'admin@betterfootball.co.nz';
+    const ADMIN_PASSWORD = 'password';
+    const ADMIN_NAME = 'BetterFootball Admin';
+    const FIRES_COLLECTION_PATH = `/artifacts/${appId}/public/data/fixtures`;
+    const LOCAL_STORAGE_KEY = `referee-fixtures-${appId}`;
 
-  // Firebase imports
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getFirestore, collection, doc, updateDoc, onSnapshot, writeBatch, query, getDocs, serverTimestamp, arrayUnion, arrayRemove, setLogLevel, deleteDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    // Night shifts fixed list and IDs (as specified)
+    const NIGHT_SHIFTS = [
+      { id: 'ns-boyd-mon-7s', venue: 'Boyd Wilson', pitch: '7s', format: '7s', isNightShift: true },
+      { id: 'ns-hub-tue-5s', venue: 'The Hub', pitch: '5s', format: '5s', isNightShift: true },
+      { id: 'ns-boyd-wed-7s', venue: 'Boyd Wilson', pitch: '7s', format: '7s', isNightShift: true },
+      { id: 'ns-alex-wed-7s', venue: 'Alex Moore', pitch: '7s', format: '7s', isNightShift: true },
+      { id: 'ns-teawhaea-thu-5s', venue: 'Te Whaea', pitch: '5s', format: '5s', isNightShift: true }
+    ];
 
-  setLogLevel('Debug');
+    // Firebase imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      getFirestore, collection, doc, updateDoc, onSnapshot, writeBatch,
+      query, getDocs, serverTimestamp, arrayUnion, arrayRemove, setLogLevel,
+      deleteDoc, getDoc, setDoc, addDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  let app, db, auth;
-  let userId = null, userName = '', userRole = 'none', isDbReady = false;
-  const editingIds = new Set();
+    setLogLevel('Debug');
 
-  // -----------------------------
-  // UTILITIES: local storage save/load
-  // -----------------------------
-  function saveFixturesLocal(fixtures) {
-    try {
-      // Persist only fixtures that have state or are weekly fixtures or night shifts with state.
-      const toSave = fixtures.filter(f => f.isNightShift || f.assignedRef || (f.volunteers && f.volunteers.length>0) || !f.isNightShift || f.hiddenThisWeek);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(toSave));
-    } catch(e){ console.error('save local failed', e); showStatus('danger', 'Local save failed'); }
-  }
+    // ----- Global state -----
+    let app, db, auth;
+    let userId = null, userName = '', userRole = 'none';
+    let isDbReady = false;
+    const editingIds = new Set();
 
-  function loadFixturesLocal() {
-    try {
-      const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch(e){ console.error('load local failed', e); return []; }
-  }
+    // ----- Utilities: local storage save/load (for fallback read-only view) -----
+    function loadFixturesLocal() {
+      try {
+        const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        console.error('load local failed', e);
+        return [];
+      }
+    }
 
-  const dateFormatter = new Intl.DateTimeFormat('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    // We DO NOT use saveFixturesLocal for admin edits when DB is down, per your instruction.
+    // Only read local data for display when DB offline.
 
-  function showStatus(type, msg) {
-    const div = document.getElementById('status-message');
-    if(!div) return;
-    div.textContent = msg;
-    div.className = 'fixed top-4 left-1/2 -translate-x-1/2 p-3 rounded-xl shadow-xl z-50 transition-all duration-300 transform';
-    div.classList.remove('hidden');
-    div.classList.remove('bg-green-100','text-green-800','bg-red-100','text-red-800','bg-yellow-100','text-yellow-800');
-    if(type === 'success'){ div.classList.add('bg-green-100','text-green-800','border','border-green-500'); }
-    else if(type === 'danger'){ div.classList.add('bg-red-100','text-red-800','border','border-red-500'); }
-    else if(type === 'warning'){ div.classList.add('bg-yellow-100','text-yellow-800','border','border-yellow-500'); }
-    setTimeout(()=>div.classList.add('hidden'),4500);
-  }
+    // ----- Helper: show status -----
+    function showStatus(type, message) {
+      const statusDiv = document.getElementById('status-message');
+      if (!statusDiv) return;
+      statusDiv.textContent = message;
+      statusDiv.className = 'fixed top-4 left-1/2 -translate-x-1/2 p-3 rounded-xl shadow-xl z-50 transition-all duration-300 transform';
+      statusDiv.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-yellow-100', 'text-yellow-800', 'bg-red-100', 'text-red-800');
+      if (type === 'success') statusDiv.classList.add('bg-green-100', 'text-green-800', 'border', 'border-green-500');
+      if (type === 'danger') statusDiv.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-500');
+      if (type === 'warning') statusDiv.classList.add('bg-yellow-100', 'text-yellow-800', 'border', 'border-yellow-500');
+      setTimeout(() => { statusDiv.classList.add('hidden'); }, 4200);
+    }
 
-  // -----------------------------
-  // PARSER (unchanged)
-  // -----------------------------
-  window.parseFixturesText = function(text) {
-    const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
-    const fixtures = [];
-    const dateRegex = /(\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/i;
-    const timeRegex = /\d{1,2}:\d{2}\s*(AM|PM|am|pm)/i;
-    const headers = ['venue','pitch','time','vs','vs:'];
-    const BYE_KEYWORD = 'bye';
-    let currentDate=null, fixtureState=0, currentFixture={};
-    for(const line of lines){
-      const dateMatch = line.match(dateRegex);
-      if(dateMatch){ currentDate = dateMatch[0]; fixtureState=0; currentFixture={}; continue; }
-      if(!currentDate) continue;
-      if(headers.includes(line.toLowerCase())) continue;
-      switch(fixtureState){
-        case 0: currentFixture = { home: line, date: currentDate }; fixtureState=1; break;
-        case 1: currentFixture.away = line; fixtureState=2; break;
-        case 2: currentFixture.venue = line; fixtureState=3; break;
-        case 3: currentFixture.pitch = line; fixtureState=4; break;
-        case 4:
-          if(line.match(timeRegex)){
-            currentFixture.time = line;
-            if(currentFixture.home.toLowerCase().includes(BYE_KEYWORD) || currentFixture.away.toLowerCase().includes(BYE_KEYWORD)){
-              // skip
-            } else {
-              const dateObj = new Date(`${currentFixture.date} ${currentFixture.time}`);
-              const tempId = crypto.randomUUID();
-              fixtures.push({
-                ...currentFixture,
-                id: tempId,
-                dateSortable: isNaN(dateObj.getTime()) ? Date.now() : dateObj.getTime(),
-                dateFormatted: isNaN(dateObj.getTime()) ? currentFixture.date : dateFormatter.format(dateObj),
-                assignedRef: null,
-                volunteers: [], status:'open', isNightShift:false
-              });
+    // ----- Date formatter -----
+    const dateFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    // ----- Paste parser (left unchanged) -----
+    // Please do not modify this function if you rely on the original behavior.
+    window.parseFixturesText = function (text) {
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      const fixtures = [];
+      const dateRegex = /(\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/i;
+      const timeRegex = /\d{1,2}:\d{2}\s*(AM|PM|am|pm)/i;
+      const headers = ['venue', 'pitch', 'time', 'vs', 'vs:'];
+      const BYE_KEYWORD = 'bye';
+      let currentDate = null, fixtureState = 0, currentFixture = {};
+      for (const line of lines) {
+        const dateMatch = line.match(dateRegex);
+        if (dateMatch) { currentDate = dateMatch[0]; fixtureState = 0; currentFixture = {}; continue; }
+        if (!currentDate) continue;
+        if (headers.includes(line.toLowerCase())) continue;
+        switch (fixtureState) {
+          case 0:
+            currentFixture = { home: line, date: currentDate };
+            fixtureState = 1;
+            break;
+          case 1:
+            currentFixture.away = line;
+            fixtureState = 2;
+            break;
+          case 2:
+            currentFixture.venue = line;
+            fixtureState = 3;
+            break;
+          case 3:
+            currentFixture.pitch = line;
+            fixtureState = 4;
+            break;
+          case 4:
+            if (line.match(timeRegex)) {
+              currentFixture.time = line;
+              if (currentFixture.home.toLowerCase().includes(BYE_KEYWORD) || currentFixture.away.toLowerCase().includes(BYE_KEYWORD)) {
+                // skip byes
+              } else {
+                const dateObj = new Date(`${currentFixture.date} ${currentFixture.time}`);
+                const tempId = crypto.randomUUID();
+                fixtures.push({
+                  ...currentFixture,
+                  id: tempId,
+                  dateSortable: isNaN(dateObj.getTime()) ? Date.now() : dateObj.getTime(),
+                  dateFormatted: isNaN(dateObj.getTime()) ? currentFixture.date : dateFormatter.format(dateObj),
+                  assignedRef: null,
+                  volunteers: [],
+                  status: 'open',
+                  isNightShift: false
+                });
+              }
+              fixtureState = 0;
+              currentFixture = {};
             }
-            fixtureState = 0; currentFixture={};
-          }
-          break;
+            break;
+        }
       }
-    }
-    return fixtures;
-  };
+      return fixtures;
+    };
 
-  // -----------------------------
-  // IDENTITY UI
-  // -----------------------------
-  function updateUIBasedOnIdentity(){
-    const display = document.getElementById('identity-display');
-    const refForm = document.getElementById('identity-form');
-    const adminForm = document.getElementById('admin-login-form');
-    const greeting = document.getElementById('ref-greeting');
-    const adminPanel = document.getElementById('admin-panel');
-    const dbStatus = document.getElementById('db-status-message');
-    const loadingText = document.getElementById('loading-text');
-    const displayRefName = document.getElementById('display-ref-name');
-    const displayRole = document.getElementById('display-role');
-    const approvedContainer = document.getElementById('approved-fixtures-container');
-    const addFixtureSection = document.getElementById('add-fixture-section');
-    const nightAdminControls = document.getElementById('night-shift-admin-controls');
+    // ----- Identity management & UI update -----
+    function updateUIBasedOnIdentity() {
+      const display = document.getElementById('identity-display');
+      const refForm = document.getElementById('identity-form');
+      const adminForm = document.getElementById('admin-login-form');
+      const greeting = document.getElementById('ref-greeting');
+      const adminPanel = document.getElementById('admin-panel');
+      const dbStatusMessage = document.getElementById('db-status-message');
+      const loadingText = document.getElementById('loading-text');
+      const displayRefName = document.getElementById('display-ref-name');
+      const displayRole = document.getElementById('display-role');
+      const approvedContainer = document.getElementById('approved-fixtures-container');
+      const addFixtureSection = document.getElementById('add-fixture-section');
+      const nightAdminControls = document.getElementById('night-shift-admin-controls');
 
-    if(refForm) refForm.classList.add('hidden');
-    if(adminForm) adminForm.classList.add('hidden');
-    if(display) display.classList.add('hidden');
-    if(adminPanel) adminPanel.classList.add('hidden');
-    if(addFixtureSection) addFixtureSection.classList.add('hidden');
-    if(nightAdminControls) nightAdminControls.classList.add('hidden');
+      // hide everything by default
+      if (refForm) refForm.classList.add('hidden');
+      if (adminForm) adminForm.classList.add('hidden');
+      if (display) display.classList.add('hidden');
+      if (adminPanel) adminPanel.classList.add('hidden');
+      if (addFixtureSection) addFixtureSection.classList.add('hidden');
+      if (nightAdminControls) nightAdminControls.classList.add('hidden');
 
-    if(userName){
-      if(display) display.classList.remove('hidden');
-      if(displayRefName) displayRefName.textContent = userName;
-      if(greeting) greeting.textContent = `Welcome, ${userName}. View and manage assignments below.`;
-      if(userRole === 'admin'){
-        if(displayRole){ displayRole.textContent = 'Administrator'; displayRole.classList.add('text-red-600'); }
-        if(approvedContainer) approvedContainer.classList.add('hidden');
-        if(adminPanel) adminPanel.classList.remove('hidden');
-        if(addFixtureSection) addFixtureSection.classList.remove('hidden');
-        if(nightAdminControls) nightAdminControls.classList.remove('block');
-        // show admin night controls
-        if(nightAdminControls) nightAdminControls.classList.remove('hidden');
+      if (userName) {
+        if (display) display.classList.remove('hidden');
+        if (displayRefName) displayRefName.textContent = userName;
+        if (greeting) greeting.textContent = `Welcome, ${userName}. View and manage assignments below.`;
+
+        if (userRole === 'admin') {
+          if (displayRole) { displayRole.textContent = 'Administrator'; displayRole.classList.add('text-red-600'); }
+          if (adminPanel) adminPanel.classList.remove('hidden');
+          if (addFixtureSection) addFixtureSection.classList.remove('hidden');
+          if (nightAdminControls) nightAdminControls.classList.remove('hidden');
+        } else {
+          if (displayRole) { displayRole.textContent = 'Referee'; displayRole.classList.remove('text-red-600'); }
+          if (approvedContainer) approvedContainer.classList.remove('hidden');
+        }
       } else {
-        if(displayRole){ displayRole.textContent = 'Referee'; displayRole.classList.remove('text-red-600');}
-        if(approvedContainer) approvedContainer.classList.remove('hidden');
+        if (refForm) refForm.classList.remove('hidden');
+        if (greeting) greeting.textContent = 'Please log in to view the schedule.';
+        if (approvedContainer) approvedContainer.classList.add('hidden');
+        userRole = 'none';
       }
-    } else {
-      if(refForm) refForm.classList.remove('hidden');
-      if(greeting) greeting.textContent = 'Please log in to view the schedule.';
-      if(approvedContainer) approvedContainer.classList.add('hidden');
-      userRole = 'none';
+
+      // Show DB status
+      if (loadingText) {
+        if (!isDbReady) loadingText.innerHTML = '⚠️ Database offline; admin actions are disabled.';
+        else if (!userName) loadingText.textContent = 'Please log in to load the schedule.';
+      }
+
+      if (dbStatusMessage) {
+        dbStatusMessage.classList.toggle('hidden', isDbReady);
+        if (!isDbReady) dbStatusMessage.textContent = 'Database offline. Admin editing disabled.';
+      }
     }
 
-    if(loadingText){
-      if(!isDbReady) loadingText.innerHTML = '⚠️ Using local storage. Data is NOT persistent or shared.';
-      else if(!userName) loadingText.textContent = 'Please log in to load the schedule.';
-    }
-  }
+    window.showAdminLoginForm = function () {
+      document.getElementById('identity-form')?.classList.add('hidden');
+      document.getElementById('admin-login-form')?.classList.remove('hidden');
+    };
 
-  window.showAdminLoginForm = function(){ document.getElementById('identity-form')?.classList.add('hidden'); document.getElementById('admin-login-form')?.classList.remove('hidden'); }
-  window.showRefereeLoginForm = function(){ document.getElementById('admin-login-form')?.classList.add('hidden'); document.getElementById('identity-form')?.classList.remove('hidden'); }
+    window.showRefereeLoginForm = function () {
+      document.getElementById('admin-login-form')?.classList.add('hidden');
+      document.getElementById('identity-form')?.classList.remove('hidden');
+    };
 
-  window.handleRefereeLogin = function(){
-    const input = document.getElementById('referee-name-input');
-    const name = input?.value?.trim();
-    if(!name) return showStatus('danger','Please enter your full name.');
-    userId = name.toLowerCase().replace(/\s/g,'-');
-    userName = name; userRole = 'referee';
-    if(auth){
-      signInAnonymously(auth).then(()=>{ updateUIBasedOnIdentity(); if(input) input.value=''; showStatus('success',`Welcome ${userName}!`); setupDataListener(); })
-      .catch(e=>{ console.error(e); showStatus('danger','Auth failed'); updateUIBasedOnIdentity(); setupDataListener(); });
-    } else {
-      updateUIBasedOnIdentity(); if(input) input.value=''; showStatus('warning','Welcome — Firebase initializing.'); setupDataListener();
-    }
-  };
+    window.handleRefereeLogin = function () {
+      const input = document.getElementById('referee-name-input');
+      const name = input?.value?.trim();
+      if (!name) return showStatus('danger', 'Please enter your full name.');
+      userId = name.toLowerCase().replace(/\s/g, '-');
+      userName = name; userRole = 'referee';
 
-  window.handleAdminLogin = function(){
-    const email = document.getElementById('admin-email')?.value.trim();
-    const pass = document.getElementById('admin-password')?.value.trim();
-    if(email === ADMIN_EMAIL && pass === ADMIN_PASSWORD){
-      userId = 'ADMIN-USER-ID'; userName = ADMIN_NAME; userRole = 'admin';
+      if (auth) {
+        signInAnonymously(auth).then(() => {
+          updateUIBasedOnIdentity();
+          if (input) input.value = '';
+          showStatus('success', `Welcome ${userName}!`);
+          setupDataListener();
+        }).catch(e => {
+          console.error('anon sign in failed', e);
+          updateUIBasedOnIdentity();
+          showStatus('warning', 'Logged in locally; database unavailable.');
+          setupDataListener();
+        });
+      } else {
+        updateUIBasedOnIdentity();
+        if (input) input.value = '';
+        showStatus('warning', 'Logged in locally; database unavailable.');
+        setupDataListener();
+      }
+    };
+
+    window.handleAdminLogin = function () {
+      const email = document.getElementById('admin-email')?.value.trim();
+      const password = document.getElementById('admin-password')?.value.trim();
+      if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+        userId = 'ADMIN-USER-ID'; userName = ADMIN_NAME; userRole = 'admin';
+        updateUIBasedOnIdentity();
+        if (!isDbReady) showStatus('warning', 'Admin logged in but database is offline. Editing disabled.');
+        else showStatus('success', 'Admin login successful.');
+        // open admin details by default
+        document.getElementById('admin-panel-details')?.classList.remove('hidden');
+        document.getElementById('admin-toggle-icon').textContent = '−';
+        setupDataListener();
+      } else {
+        showStatus('danger', 'Invalid admin credentials.');
+      }
+    };
+
+    window.clearIdentity = function () {
+      userId = null; userName = ''; userRole = 'none';
+      if (auth && auth.signOut) auth.signOut();
       updateUIBasedOnIdentity();
-      showStatus(isDbReady ? 'success' : 'warning', isDbReady ? 'Admin login successful. Database ready.' : 'Admin login successful. Using local fallback.');
-      document.getElementById('admin-panel-details')?.classList.remove('hidden');
-      document.getElementById('admin-toggle-icon').textContent = '−';
+      showStatus('warning', 'Logged out.');
       setupDataListener();
-    } else showStatus('danger','Invalid admin credentials.');
-  };
+    };
 
-  window.clearIdentity = function(){
-    userId = userName = ''; userRole = 'none';
-    if(auth && auth.signOut) auth.signOut();
-    updateUIBasedOnIdentity(); showStatus('warning','Logged out.'); setupDataListener();
-  };
+    // collapse control panel
+    window.toggleControlPanel = function () {
+      const panel = document.getElementById('user-control-panel');
+      const content = document.getElementById('panel-content');
+      const btn = document.getElementById('collapse-panel-btn');
+      if (panel.classList.contains('panel-collapsed')) {
+        panel.classList.remove('panel-collapsed');
+        content.classList.remove('collapsed-hide');
+        btn.textContent = '▲';
+      } else {
+        panel.classList.add('panel-collapsed');
+        content.classList.add('collapsed-hide');
+        btn.textContent = '▼';
+      }
+    };
 
-  // COLLAPSE PANEL
-  function toggleControlPanel(){
-    const panel = document.getElementById('user-control-panel');
-    const content = document.getElementById('panel-content');
-    const btn = document.getElementById('collapse-panel-btn');
-    if(panel.classList.contains('panel-collapsed')){
-      panel.classList.remove('panel-collapsed');
-      content.classList.remove('collapsed-hide');
-      btn.textContent = '▲';
-    } else {
-      panel.classList.add('panel-collapsed');
-      content.classList.add('collapsed-hide');
-      btn.textContent = '▼';
-    }
-  }
+    // admin toggle for paste area
+    window.toggleAdminPanel = function () {
+      const details = document.getElementById('admin-panel-details');
+      const icon = document.getElementById('admin-toggle-icon');
+      if (!details || !icon) return;
+      if (details.classList.contains('hidden')) {
+        details.classList.remove('hidden');
+        icon.textContent = '−';
+      } else {
+        details.classList.add('hidden');
+        icon.textContent = '+';
+      }
+    };
+    document.getElementById('admin-panel-summary')?.addEventListener('click', toggleAdminPanel);
 
-  // -----------------------------
-  // FIREBASE INIT
-  // -----------------------------
-  async function initFirebase(){
-    const loadingText = document.getElementById('loading-text');
-    if(!rawFirebaseConfig || !rawFirebaseConfig.projectId){ isDbReady = false; updateUIBasedOnIdentity(); setupDataListener(); if(loadingText) loadingText.innerHTML='❌ ERROR: Firebase config missing. Using local storage.'; return; }
-    try {
-      app = initializeApp(rawFirebaseConfig);
-      db = getFirestore(app);
-      auth = getAuth(app);
-      isDbReady = true;
-      if(initialAuthToken){ await signInWithCustomToken(auth, initialAuthToken); } else { await signInAnonymously(auth); }
-      onAuthStateChanged(auth, (user)=>{ if(user) setupDataListener(); });
-      updateUIBasedOnIdentity();
-    } catch(e){ console.error('firebase init', e); isDbReady=false; showStatus('danger','Firebase failed — using local storage.'); updateUIBasedOnIdentity(); setupDataListener(); }
-  }
+    // ----- Firebase init -----
+    async function initFirebase() {
+      if (!rawFirebaseConfig || !rawFirebaseConfig.projectId) {
+        console.warn('Firebase config missing; running in offline mode (admin disabled)');
+        isDbReady = false;
+        updateUIBasedOnIdentity();
+        setupDataListener();
+        return;
+      }
+      try {
+        app = initializeApp(rawFirebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        isDbReady = true;
 
-  // -----------------------------
-  // MERGE NIGHT SHIFTS WITH DYNAMIC STATE
-  // -----------------------------
-  function mergeNightShifts(dynamicFixtures){
-    const dynamicMap = new Map();
-    const weeklyFixtures = [];
-    dynamicFixtures.forEach(f=>{
-      const isNight = NIGHT_SHIFTS.some(n=>n.id===f.id);
-      if(isNight) dynamicMap.set(f.id,f); else weeklyFixtures.push(f);
-    });
+        if (INITIAL_AUTH_TOKEN) {
+          await signInWithCustomToken(auth, INITIAL_AUTH_TOKEN);
+        } else {
+          await signInAnonymously(auth);
+        }
 
-    const merged = [];
-    NIGHT_SHIFTS.forEach(staticShift=>{
-      const copy = { ...staticShift, volunteers:[], assignedRef:null, status:'open', hiddenThisWeek:false };
-      const dyn = dynamicMap.get(staticShift.id);
-      if(dyn) Object.assign(copy, dyn);
-      merged.push(copy);
-    });
-    merged.push(...weeklyFixtures);
-    return merged;
-  }
-
-  // -----------------------------
-  // LOAD / LISTENER
-  // -----------------------------
-  function setupDataListener(){
-    const loadingIndicator = document.getElementById('loading-indicator');
-    if(loadingIndicator) loadingIndicator.classList.remove('hidden');
-
-    // Local-only path (or fallback)
-    if(!isDbReady || !db){
-      // If no saved fixtures, start clean with just night shift static definitions
-      const local = loadFixturesLocal();
-      // Only include local weekly fixtures if present; otherwise keep only night shift static definitions
-      const hasWeekly = local.some(f => !f.isNightShift);
-      const base = hasWeekly ? local : []; // if no weekly, don't pre-populate
-      const all = mergeNightShifts(base);
-      all.sort((a,b) => (a.dateSortable||0) - (b.dateSortable||0));
-      if(loadingIndicator) loadingIndicator.classList.add('hidden');
-      renderAll(all);
-      return;
+        onAuthStateChanged(auth, (u) => { if (u) setupDataListener(); });
+        updateUIBasedOnIdentity();
+      } catch (e) {
+        console.error('Firebase init failed', e);
+        isDbReady = false;
+        updateUIBasedOnIdentity();
+        setupDataListener();
+      }
     }
 
-    // Firebase live path
-    const fixturesRef = collection(db, FIRES_COLLECTION_PATH);
-    const q = query(fixturesRef);
-    onSnapshot(q, (snapshot)=>{
-      const dyn = [];
-      snapshot.forEach(docSnap => { dyn.push({ id: docSnap.id, ...docSnap.data() }); });
-      const all = mergeNightShifts(dyn);
-      all.sort((a,b)=> (a.dateSortable||0) - (b.dateSortable||0));
-      if(loadingIndicator) loadingIndicator.classList.add('hidden');
-      renderAll(all);
-    }, (err)=>{
-      console.error('firestore listen', err);
-      isDbReady = false;
-      setupDataListener();
-      showStatus('danger','Error fetching live schedule. Using local storage.');
-    });
-  }
-
-  // -----------------------------
-  // RENDERING: Night Shifts + Fixtures
-  // -----------------------------
-  function renderNightShifts(allFixtures){
-    const container = document.getElementById('night-shifts-container'); if(!container) return;
-    container.innerHTML = '';
-
-    const nightOnly = allFixtures.filter(f => f.isNightShift);
-    let anyHidden = false;
-    nightOnly.forEach(shift=>{
-      if(shift.hiddenThisWeek) anyHidden = true;
-      // Admin sees hidden shifts (faded) — refs don't see hidden ones
-      if(shift.hiddenThisWeek && userRole !== 'admin') return;
-
-      const card = document.createElement('div');
-      card.className = `nightshift-card bg-white rounded-xl shadow-md p-3 flex flex-col justify-between ${shift.hiddenThisWeek ? 'faded' : ''}`;
-      card.setAttribute('data-id', shift.id);
-      card.innerHTML = `
-        <div class="flex justify-between items-start">
-          <div>
-            <p class="text-sm font-semibold text-gray-900">${shift.venue}</p>
-            <p class="text-xs text-gray-500">${shift.pitch} • ${shift.format || ''}</p>
-          </div>
-          <div class="text-right text-xs">
-            ${shift.assignedRef ? `<div class="text-sm font-bold text-green-700">Assigned</div><div class="text-xs">${shift.assignedRef}</div>` : `<div class="text-sm font-semibold text-red-600">${(shift.volunteers||[]).length} Volunteers</div>`}
-          </div>
-        </div>
-        <div class="mt-3 flex justify-between items-center">
-          <div class="text-xs text-gray-500">Night Shift</div>
-          <div class="flex gap-2 items-center">
-            ${userRole==='admin' ? `<button onclick="event.stopPropagation(); hideNightShift('${shift.id}')" class="text-xs text-gray-600 hover:text-red-600">🗑️ Hide</button>` : ''}
-            ${userRole==='referee' ? `<button onclick="event.stopPropagation(); handleVolunteer(null,'${shift.id}', true)" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded">Apply</button>` : ''}
-          </div>
-        </div>
-      `;
-      container.appendChild(card);
-    });
-
-    // show restore hidden button only if one or more hidden and admin logged in
-    const restoreBtn = document.getElementById('restore-hidden-btn');
-    if(restoreBtn){
-      const hasHidden = nightOnly.some(n => n.hiddenThisWeek);
-      if(userRole==='admin' && hasHidden) restoreBtn.classList.remove('hidden'); else restoreBtn.classList.add('hidden');
+    // ----- Night shift helpers: ensure static docs exist in Firestore -----
+    async function ensureNightShiftsExistInDb() {
+      if (!isDbReady || !db) return;
+      try {
+        const col = collection(db, FIRES_COLLECTION_PATH);
+        // For each fixed night shift ID, if it's missing in db create it.
+        for (const s of NIGHT_SHIFTS) {
+          const docRef = doc(db, FIRES_COLLECTION_PATH, s.id);
+          const snap = await getDoc(docRef);
+          if (!snap.exists()) {
+            // create doc with static fields & default state
+            await setDoc(docRef, {
+              id: s.id,
+              venue: s.venue,
+              pitch: s.pitch,
+              format: s.format,
+              isNightShift: true,
+              volunteers: [],
+              assignedRef: null,
+              status: 'open',
+              hiddenThisWeek: false,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            });
+          }
+        }
+      } catch (e) {
+        console.error('ensureNightShiftsExistInDb failed', e);
+      }
     }
-  }
 
-  function renderAll(allFixtures){
-    // night shifts first
-    renderNightShifts(allFixtures);
+    // ----- Merge night shifts with dynamic state (docs or local) -----
+    function mergeNightShifts(dynamicFixtures) {
+      const dynamicMap = new Map();
+      const weekly = [];
+      dynamicFixtures.forEach(f => {
+        if (NIGHT_SHIFTS.some(n => n.id === f.id)) dynamicMap.set(f.id, f);
+        else weekly.push(f);
+      });
 
-    // approved list rendering (for refs)
-    const approvedListContainer = document.getElementById('approved-fixtures-list');
-    const approvedContainer = document.getElementById('approved-fixtures-container');
-    const now = Date.now();
-    if(approvedListContainer && approvedContainer){
-      if(userName && userRole==='referee'){
-        approvedContainer.classList.remove('hidden');
-        approvedListContainer.innerHTML = '';
-        const approved = allFixtures.filter(f => f.assignedRef === userName && (f.dateSortable >= now || f.isNightShift)).sort((a,b)=> (a.dateSortable||0)-(b.dateSortable||0));
-        if(approved.length){
-          approved.forEach(f=>{
-            const card = document.createElement('div');
-            card.className = 'fixture-card rounded-xl shadow-md overflow-hidden bg-green-100 border-l-4 border-green-700';
-            card.innerHTML = `<div class="fixture-main-content">
+      const merged = [];
+      for (const staticShift of NIGHT_SHIFTS) {
+        const base = {
+          id: staticShift.id,
+          venue: staticShift.venue,
+          pitch: staticShift.pitch,
+          format: staticShift.format,
+          isNightShift: true,
+          volunteers: [],
+          assignedRef: null,
+          status: 'open',
+          hiddenThisWeek: false
+        };
+        const dynamic = dynamicMap.get(staticShift.id);
+        if (dynamic) Object.assign(base, dynamic);
+        merged.push(base);
+      }
+
+      merged.push(...weekly);
+      return merged;
+    }
+
+    // ----- Parse & Load fixtures (admin paste) - unchanged behavior -----
+    window.parseAndLoadFixtures = async function () {
+      if (userRole !== 'admin') return showStatus('danger', 'Permission denied. Only Admin can load fixtures.');
+      if (!isDbReady) {
+        // per your instruction: admin operations disabled when DB offline
+        return showStatus('danger', 'Database offline. Cannot process paste while offline.');
+      }
+
+      const pasteText = document.getElementById('fixtures-paste-area')?.value;
+      const fixturesToLoad = parseFixturesText(pasteText || '');
+      if (!fixturesToLoad.length) return showStatus('warning', 'No fixtures parsed from paste.');
+      // Save to Firestore using batch: delete old weekly fixtures first, preserve night shift docs
+      try {
+        const colRef = collection(db, FIRES_COLLECTION_PATH);
+        const snapshot = await getDocs(query(colRef));
+        const batch = writeBatch(db);
+        // delete existing weekly fixtures
+        snapshot.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          const isNight = NIGHT_SHIFTS.some(n => n.id === data.id);
+          if (!isNight) batch.delete(docSnap.ref);
+        });
+        // add new weekly fixtures
+        for (const f of fixturesToLoad) {
+          const docRef = doc(colRef); // let firestore generate id
+          const toSet = {
+            ...f,
+            id: docRef.id,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          };
+          batch.set(docRef, toSet);
+        }
+        await batch.commit();
+        document.getElementById('fixtures-paste-area').value = '';
+        showStatus('success', `Loaded ${fixturesToLoad.length} fixtures.`);
+      } catch (e) {
+        console.error('parseAndLoadFixtures failed', e);
+        showStatus('danger', 'Failed to save fixtures to database.');
+      }
+    };
+
+    window.clearPasteArea = function () {
+      document.getElementById('fixtures-paste-area').value = '';
+    };
+
+    // ----- Main data listener (Firestore live) or local fallback read-only -----
+    function setupDataListener() {
+      const loadingIndicator = document.getElementById('loading-indicator');
+      if (loadingIndicator) loadingIndicator.classList.remove('hidden');
+
+      if (!isDbReady || !db) {
+        // Local-only: display local stored fixtures if any; otherwise show only night shifts (static)
+        const local = loadFixturesLocal();
+        // If there are weekly fixtures stored locally, include them; otherwise keep only night shifts (which are static)
+        const merged = mergeNightShifts(local);
+        // Sort by dateSortable for weekly fixtures (night shifts have no dateSortable)
+        merged.sort((a, b) => (a.dateSortable || 0) - (b.dateSortable || 0));
+        if (loadingIndicator) loadingIndicator.classList.add('hidden');
+        renderAll(merged);
+        return;
+      }
+
+      // If DB is ready: ensure night shifts exist, then listen live
+      ensureNightShiftsExistInDb().then(() => {
+        const colRef = collection(db, FIRES_COLLECTION_PATH);
+        const q = query(colRef);
+        onSnapshot(q, (snapshot) => {
+          const dyn = [];
+          snapshot.forEach(docSnap => dyn.push({ id: docSnap.id, ...docSnap.data() }));
+          const merged = mergeNightShifts(dyn);
+          merged.sort((a, b) => (a.dateSortable || 0) - (b.dateSortable || 0));
+          if (loadingIndicator) loadingIndicator.classList.add('hidden');
+          renderAll(merged);
+        }, (err) => {
+          console.error('Firestore listener failed', err);
+          isDbReady = false;
+          updateUIBasedOnIdentity();
+          setupDataListener(); // fallback display
+          showStatus('danger', 'Database listener failed; running in offline mode (admin disabled).');
+        });
+      }).catch(err => {
+        console.error('ensure night shifts failed', err);
+        setupDataListener();
+      });
+    }
+
+    // ----- Render functions -----
+    function renderNightShifts(allFixtures) {
+      const container = document.getElementById('night-shifts-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const nightOnly = allFixtures.filter(f => f.isNightShift);
+      for (const shift of nightOnly) {
+        if (shift.hiddenThisWeek && userRole !== 'admin') continue; // refs don't see hidden shifts
+
+        const card = document.createElement('div');
+        card.className = `nightshift-card bg-white rounded-xl shadow-md p-3 flex flex-col justify-between ${shift.hiddenThisWeek ? 'faded' : ''}`;
+        card.setAttribute('data-id', shift.id);
+
+        // Determine visual state:
+        // - Approved: shift.assignedRef exists (green)
+        // - Pending: volunteers length > 0 and not assigned (yellow)
+        // - Open: white
+        let statusClass = '';
+        if (shift.assignedRef) statusClass = 'status-approved';
+        else if ((shift.volunteers || []).length > 0) statusClass = 'status-pending';
+
+        const rightArea = document.createElement('div');
+        rightArea.className = 'flex flex-col items-end text-right';
+
+        // Volunteers or assigned label
+        if (shift.assignedRef) {
+          rightArea.innerHTML = `<div class="text-sm font-bold text-green-700">Assigned</div><div class="text-xs">${shift.assignedRef}</div>`;
+        } else {
+          rightArea.innerHTML = `<div class="text-sm font-semibold ${((shift.volunteers||[]).length>0) ? 'text-yellow-700' : 'text-red-600'}">${(shift.volunteers||[]).length} Volunteer(s)</div>`;
+        }
+
+        // Build card innerHTML for consistency
+        card.innerHTML = `
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="text-sm font-semibold text-gray-900">${shift.venue}</p>
+              <p class="text-xs text-gray-500">${shift.pitch} • ${shift.format || ''}</p>
+            </div>
+            <div class="text-xs text-right"></div>
+          </div>
+          <div class="mt-3 flex justify-between items-center">
+            <div class="text-xs text-gray-500">Night Shift</div>
+            <div class="flex gap-2 items-center"></div>
+          </div>
+        `;
+
+        // Apply background status color
+        if (statusClass === 'status-approved') card.classList.add('status-approved');
+        else if (statusClass === 'status-pending') card.classList.add('status-pending');
+
+        // Build bottom action area (buttons)
+        const actionRow = document.createElement('div');
+        actionRow.className = 'mt-2 flex items-center justify-between';
+
+        // Left: volunteer/apply or assigned label for refs
+        if (userRole === 'referee') {
+          const isVolunteer = (shift.volunteers || []).includes(userName);
+          if (shift.assignedRef === userName) {
+            actionRow.innerHTML = `<div class="text-sm font-bold text-green-700">APPROVED</div>`;
+          } else if (isVolunteer) {
+            actionRow.innerHTML = `<button class="px-2 py-1 text-xs bg-yellow-500 text-white rounded" onclick="handleVolunteer(event, '${shift.id}', false)">Cancel</button>`;
+          } else {
+            actionRow.innerHTML = `<button class="px-2 py-1 text-xs bg-indigo-600 text-white rounded" onclick="handleVolunteer(event, '${shift.id}', true)">Apply</button>`;
+          }
+        } else {
+          actionRow.innerHTML = `<div class="text-xs text-gray-600">${(shift.volunteers||[]).length} volunteer(s)</div>`;
+        }
+
+        // Right: admin controls (approve/restore/hide)
+        const adminControls = document.createElement('div');
+        adminControls.className = 'flex gap-2 items-center';
+
+        if (userRole === 'admin' && isDbReady) {
+          // Approve button if volunteers exist and not assigned
+          if ((shift.volunteers || []).length > 0 && !shift.assignedRef) {
+            const approveBtn = document.createElement('button');
+            approveBtn.className = 'px-2 py-1 text-xs bg-green-600 text-white rounded';
+            approveBtn.textContent = 'Approve';
+            approveBtn.onclick = () => openAssignmentModal(shift.id, shift.venue, shift.pitch, 'Night Shift', '', JSON.stringify(shift.volunteers || []), '');
+            adminControls.appendChild(approveBtn);
+          } else if (shift.assignedRef) {
+            const revokeBtn = document.createElement('button');
+            revokeBtn.className = 'px-2 py-1 text-xs bg-red-500 text-white rounded';
+            revokeBtn.textContent = 'Revoke';
+            revokeBtn.onclick = (e) => { e.stopPropagation(); handleUnassign(shift.id); };
+            adminControls.appendChild(revokeBtn);
+          }
+
+          // If hiddenThisWeek true -> show restore for that shift; otherwise show hide
+          if (shift.hiddenThisWeek) {
+            const restoreBtn = document.createElement('button');
+            restoreBtn.className = 'px-2 py-1 text-xs border rounded';
+            restoreBtn.textContent = 'Restore';
+            restoreBtn.onclick = (e) => { e.stopPropagation(); restoreNightShift(shift.id); };
+            adminControls.appendChild(restoreBtn);
+          } else {
+            const hideBtn = document.createElement('button');
+            hideBtn.className = 'px-2 py-1 text-xs text-gray-600 hover:text-red-600';
+            hideBtn.textContent = 'Hide';
+            hideBtn.onclick = (e) => { e.stopPropagation(); hideNightShift(shift.id); };
+            adminControls.appendChild(hideBtn);
+          }
+        } else if (userRole === 'admin' && !isDbReady) {
+          // DB offline => admin disabled (per instruction)
+          const disabledNote = document.createElement('span');
+          disabledNote.className = 'text-xs text-gray-400';
+          disabledNote.textContent = 'DB offline';
+          adminControls.appendChild(disabledNote);
+        }
+
+        actionRow.appendChild(adminControls);
+        card.appendChild(actionRow);
+
+        container.appendChild(card);
+      }
+    }
+
+    function renderAll(allFixtures) {
+      renderNightShifts(allFixtures);
+
+      // Approved list for referees
+      const approvedListContainer = document.getElementById('approved-fixtures-list');
+      const approvedContainer = document.getElementById('approved-fixtures-container');
+      const now = Date.now();
+      if (approvedListContainer && approvedContainer) {
+        if (userName && userRole === 'referee') {
+          approvedContainer.classList.remove('hidden');
+          approvedListContainer.innerHTML = '';
+          const approved = allFixtures.filter(f => f.assignedRef === userName && (f.isNightShift || (f.dateSortable && f.dateSortable >= now))).sort((a, b) => (a.dateSortable || 0) - (b.dateSortable || 0));
+          if (approved.length) {
+            for (const f of approved) {
+              const card = document.createElement('div');
+              card.className = 'fixture-card rounded-xl shadow-md overflow-hidden bg-green-100 border-l-4 border-green-700';
+              card.innerHTML = `
+                <div class="fixture-main-content">
+                  <div class="flex flex-col flex-shrink-0 w-16 text-center">
+                    <span class="text-lg font-bold text-gray-900 leading-none">${f.time||''}</span>
+                    <span class="text-xs font-medium text-gray-500 hidden sm:block">${f.dateFormatted||''}</span>
+                  </div>
+                  <div class="flex-grow min-w-0 pr-4">
+                    <p class="text-base font-semibold text-gray-900 truncate">${f.isNightShift ? f.venue + ' • ' + f.pitch : (f.home + ' vs ' + f.away)}</p>
+                    <p class="text-xs text-green-700 font-bold">APPROVED</p>
+                  </div>
+                  <div class="flex flex-col flex-shrink-0 w-24 text-right">
+                    <span class="text-sm font-semibold text-gray-700 truncate">${f.venue||''}</span>
+                    <span class="text-xs font-medium text-red-600">${f.isNightShift ? '' : ('Pitch ' + (f.pitch||''))}</span>
+                  </div>
+                </div>
+                <div class="fixture-action-area bg-green-200 text-center text-sm font-bold text-green-800">CONFIRMED</div>
+              `;
+              approvedListContainer.appendChild(card);
+            }
+          } else approvedListContainer.innerHTML = `<p class="text-center py-4 text-gray-500">You have no approved assignments yet.</p>`;
+        } else approvedContainer.classList.add('hidden');
+      }
+
+      // Render weekly fixtures only (exclude night shifts)
+      const upcomingList = document.getElementById('upcoming-fixtures-list');
+      if (!upcomingList) return;
+      upcomingList.innerHTML = '';
+
+      let groupedDate = null;
+      let anyWeekly = false;
+
+      const weekly = allFixtures.filter(f => !f.isNightShift && !f.hiddenThisWeek);
+      weekly.sort((a, b) => (a.dateSortable || 0) - (b.dateSortable || 0));
+
+      for (const fixture of weekly) {
+        // Exclude past matches if desired (keeps original behavior)
+        if (fixture.dateSortable && fixture.dateSortable < Date.now()) continue;
+        anyWeekly = true;
+
+        const dateHeaderKey = fixture.dateFormatted || (fixture.dateSortable ? new Date(fixture.dateSortable).toDateString() : 'TBA');
+        if (dateHeaderKey !== groupedDate) {
+          groupedDate = dateHeaderKey;
+          const header = document.createElement('h3');
+          header.className = 'text-xl font-bold text-gray-800 mt-6 mb-3 p-2 bg-gray-200 rounded-lg shadow-inner';
+          header.textContent = groupedDate;
+          upcomingList.appendChild(header);
+        }
+
+        const card = document.createElement('div');
+        card.className = 'fixture-card rounded-xl shadow-md overflow-hidden transition duration-300 bg-white border-l-4 border-red-500';
+        card.setAttribute('data-id', fixture.id);
+
+        // Determine status for coloring
+        let statusClass = '';
+        if (fixture.status === 'assigned') statusClass = 'status-approved';
+        else if ((fixture.volunteers || []).length > 0) statusClass = 'status-pending';
+
+        // build inner markup
+        const teamText = `${fixture.home} vs ${fixture.away}`;
+        const venueText = fixture.venue || '';
+        const pitchText = fixture.pitch || '';
+
+        // admin edit mode
+        if (userRole === 'admin' && editingIds.has(fixture.id) && isDbReady) {
+          // Provide date/time inputs and fields
+          const isoDate = fixture.dateSortable ? new Date(fixture.dateSortable).toISOString().slice(0, 10) : '';
+          const isoTime = fixture.time ? convertTimeTo24(fixture.time) : '';
+          card.innerHTML = `
+            <div class="fixture-main-content">
               <div class="flex flex-col flex-shrink-0 w-16 text-center">
-                <span class="text-lg font-bold text-gray-900 leading-none">${f.time||''}</span>
-                <span class="text-xs font-medium text-gray-500 hidden sm:block">${f.dateFormatted||''}</span>
+                <input id="edit-date-${fixture.id}" type="date" value="${isoDate}" class="p-1 text-sm border rounded"/>
+                <input id="edit-time-${fixture.id}" type="time" value="${isoTime}" class="p-1 text-sm border rounded mt-1"/>
               </div>
               <div class="flex-grow min-w-0 pr-4">
-                <p class="text-base font-semibold text-gray-900 truncate">${f.home} vs ${f.away}</p>
-                <p class="text-xs text-green-700 font-bold">ASSIGNED</p>
+                <input id="edit-home-${fixture.id}" class="w-full p-1 border rounded mb-1 text-sm" value="${escapeHtml(fixture.home||'')}" />
+                <input id="edit-away-${fixture.id}" class="w-full p-1 border rounded text-sm" value="${escapeHtml(fixture.away||'')}" />
               </div>
               <div class="flex flex-col flex-shrink-0 w-24 text-right">
-                <span class="text-sm font-semibold text-gray-700 truncate">${f.venue||''}</span>
-                <span class="text-xs font-medium text-red-600">Pitch ${f.pitch||''}</span>
+                <input id="edit-venue-${fixture.id}" class="w-full text-sm p-1 border rounded mb-1" value="${escapeHtml(venueText)}" />
+                <input id="edit-pitch-${fixture.id}" class="w-full text-xs p-1 border rounded" value="${escapeHtml(pitchText)}" />
               </div>
             </div>
-            <div class="fixture-action-area bg-green-200 text-center text-sm font-bold text-green-800">CONFIRMED</div>`;
-            approvedListContainer.appendChild(card);
-          });
-        } else approvedListContainer.innerHTML = `<p class="text-center py-4 text-gray-500">You have no approved assignments yet.</p>`;
-      } else approvedContainer.classList.add('hidden');
-    }
-
-    // Now render weekly fixtures only (exclude night shifts entirely from the list)
-    const upcomingList = document.getElementById('upcoming-fixtures-list');
-    if(!upcomingList) return;
-    upcomingList.innerHTML = '';
-
-    let groupedDate = null;
-    let fixtureFound = false;
-
-    const weeklyFixtures = allFixtures.filter(f => !f.isNightShift && !f.hiddenThisWeek);
-    weeklyFixtures.sort((a,b)=> (a.dateSortable||0)-(b.dateSortable||0));
-
-    weeklyFixtures.forEach(fixture => {
-      if(!fixture.home || !fixture.away) return;
-      // skip past if older than now
-      if(fixture.dateSortable && fixture.dateSortable < Date.now()) return;
-      fixtureFound = true;
-      const dateHeaderKey = fixture.dateFormatted || (new Date(fixture.dateSortable||Date.now())).toDateString();
-      if(dateHeaderKey !== groupedDate){
-        groupedDate = dateHeaderKey;
-        const header = document.createElement('h3');
-        header.className = "text-xl font-bold text-gray-800 mt-6 mb-3 p-2 bg-gray-200 rounded-lg shadow-inner";
-        header.textContent = groupedDate;
-        upcomingList.appendChild(header);
-      }
-
-      const card = document.createElement('div');
-      card.className = 'fixture-card rounded-xl shadow-md overflow-hidden transition duration-300 bg-white border-l-4 border-red-500';
-      card.setAttribute('data-id', fixture.id);
-
-      // prepare status and actions
-      const volunteerCount = (fixture.volunteers||[]).length;
-      const isVolunteer = userName && (fixture.volunteers||[]).includes(userName);
-
-      let statusBadge = '';
-      if(fixture.status === 'assigned') statusBadge = `<span class="text-sm font-bold text-green-700">ASSIGNED</span>`;
-      else if(isVolunteer) statusBadge = `<span class="text-sm font-bold text-yellow-700">APPLIED</span>`;
-      else statusBadge = `<span class="text-sm font-bold text-red-700">OPEN (${volunteerCount})</span>`;
-
-      // if admin and editing for this id -> render inputs
-      if(userRole === 'admin' && editingIds.has(fixture.id)){
-        const dateVal = fixture.dateSortable ? new Date(fixture.dateSortable) : null;
-        const isoDate = dateVal ? dateVal.toISOString().slice(0,10) : '';
-        const timeVal = fixture.time ? convertTimeTo24(fixture.time) : '';
-        card.innerHTML = `
-          <div class="fixture-main-content">
-            <div class="flex flex-col flex-shrink-0 w-16 text-center">
-              <input id="edit-date-${fixture.id}" type="date" value="${isoDate}" class="p-1 text-sm border rounded"/>
-              <input id="edit-time-${fixture.id}" type="time" value="${timeVal}" class="p-1 text-sm border rounded mt-1"/>
-            </div>
-            <div class="flex-grow min-w-0 pr-4">
-              <input id="edit-home-${fixture.id}" class="w-full p-1 border rounded mb-1 text-sm" value="${escapeHtml(fixture.home||'')}" />
-              <input id="edit-away-${fixture.id}" class="w-full p-1 border rounded text-sm" value="${escapeHtml(fixture.away||'')}" />
-            </div>
-            <div class="flex flex-col flex-shrink-0 w-24 text-right">
-              <input id="edit-venue-${fixture.id}" class="w-full text-sm p-1 border rounded mb-1" value="${escapeHtml(fixture.venue||'')}" />
-              <input id="edit-pitch-${fixture.id}" class="w-full text-xs p-1 border rounded" value="${escapeHtml(fixture.pitch||'')}" />
-            </div>
-            <div class="flex-shrink-0 block sm:hidden">${statusBadge}</div>
-          </div>
-          <div class="fixture-action-area flex items-center justify-between">
-            <div class="text-xs text-gray-500">Editing</div>
-            <div class="flex gap-2">
-              <button onclick="event.stopPropagation(); saveEdit('${fixture.id}')" class="px-2 py-1 text-xs bg-green-600 text-white rounded">💾 Save</button>
-              <button onclick="event.stopPropagation(); cancelEdit('${fixture.id}')" class="px-2 py-1 text-xs border rounded">Cancel</button>
-              <button onclick="event.stopPropagation(); permanentlyDeleteFixture('${fixture.id}')" class="px-2 py-1 text-xs text-red-600 hover:text-red-800">❌ Delete</button>
-            </div>
-          </div>
-        `;
-      } else {
-        // regular display for card
-        card.innerHTML = `
-          <div class="fixture-main-content">
-            <div class="flex flex-col flex-shrink-0 w-16 text-center">
-              <span class="text-lg font-bold text-gray-900 leading-none">${fixture.time||''}</span>
-              <span class="text-xs font-medium text-gray-500 hidden sm:block">${fixture.dateFormatted||''}</span>
-            </div>
-            <div class="flex-grow min-w-0 pr-4">
-              <p class="text-base font-semibold text-gray-900 truncate">${fixture.home} vs ${fixture.away}</p>
-            </div>
-            <div class="flex flex-col flex-shrink-0 w-24 text-right">
-              <span class="text-sm font-semibold text-gray-700 truncate">${fixture.venue||''}</span>
-              <span class="text-xs font-medium text-red-600">Pitch ${fixture.pitch||''}</span>
-            </div>
-            <div class="flex-shrink-0 block sm:hidden">${statusBadge}</div>
-          </div>
-          <div class="fixture-action-area">
-            <div class="flex items-center justify-between">
-              <div>
-                ${renderActionHtmlForUser(fixture)}
-              </div>
+            <div class="fixture-action-area flex items-center justify-between">
+              <div class="text-xs text-gray-500">Editing</div>
               <div class="flex gap-2">
-                ${userRole==='admin' ? `<button onclick="event.stopPropagation(); startEdit('${fixture.id}')" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded">✏️ Edit</button>
-                <button onclick="event.stopPropagation(); permanentlyDeleteFixture('${fixture.id}')" class="px-2 py-1 text-xs text-red-600 hover:text-red-800">❌ Delete</button>` : ''}
+                <button onclick="event.stopPropagation(); saveEdit('${fixture.id}')" class="px-2 py-1 text-xs bg-green-600 text-white rounded">💾 Save</button>
+                <button onclick="event.stopPropagation(); cancelEdit('${fixture.id}')" class="px-2 py-1 text-xs border rounded">Cancel</button>
+                <button onclick="event.stopPropagation(); permanentlyDeleteFixture('${fixture.id}')" class="px-2 py-1 text-xs text-red-600 hover:text-red-800">❌ Delete</button>
               </div>
             </div>
-          </div>
-        `;
+          `;
+        } else {
+          // normal card (with action area for admin/ref)
+          card.innerHTML = `
+            <div class="fixture-main-content ${statusClass ? statusClass : ''}">
+              <div class="flex flex-col flex-shrink-0 w-16 text-center">
+                <span class="text-lg font-bold text-gray-900 leading-none">${fixture.time || ''}</span>
+                <span class="text-xs font-medium text-gray-500 hidden sm:block">${fixture.dateFormatted || ''}</span>
+              </div>
+              <div class="flex-grow min-w-0 pr-4">
+                <p class="text-base font-semibold text-gray-900 truncate">${teamText}</p>
+              </div>
+              <div class="flex flex-col flex-shrink-0 w-24 text-right">
+                <span class="text-sm font-semibold text-gray-700 truncate">${venueText}</span>
+                <span class="text-xs font-medium text-red-600">Pitch ${pitchText}</span>
+              </div>
+            </div>
+            <div class="fixture-action-area">
+              <div class="flex items-center justify-between">
+                <div>
+                  ${renderActionHtmlForUser(fixture)}
+                </div>
+                <div class="flex gap-2">
+                  ${userRole === 'admin' ? (isDbReady ? `<button onclick="event.stopPropagation(); startEdit('${fixture.id}')" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded">✏️ Edit</button>
+                  <button onclick="event.stopPropagation(); permanentlyDeleteFixture('${fixture.id}')" class="px-2 py-1 text-xs text-red-600 hover:text-red-800">❌ Delete</button>` : `<span class="text-xs text-gray-400">DB offline</span>`) : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        if (statusClass === 'status-approved') card.classList.add('status-approved');
+        else if (statusClass === 'status-pending') card.classList.add('status-pending');
+
+        upcomingList.appendChild(card);
       }
 
-      upcomingList.appendChild(card);
-    });
-
-    if(!fixtureFound){
-      const li = document.createElement('p');
-      li.className = 'text-center py-10 text-gray-500';
-      li.textContent = userName ? 'No weekly fixtures have been loaded. Only Night Shifts are available.' : 'No upcoming fixtures. Admin needs to load the schedule.';
-      upcomingList.appendChild(li);
+      if (!anyWeekly) {
+        const p = document.createElement('p');
+        p.className = 'text-center py-10 text-gray-500';
+        p.textContent = userName ? 'No weekly fixtures have been loaded. Only night shifts are available.' : 'No upcoming fixtures. Admin needs to load the schedule.';
+        upcomingList.appendChild(p);
+      }
     }
-  }
 
-  // Helper to build action area depending on role
-  function renderActionHtmlForUser(fixture){
-    const volunteerCount = (fixture.volunteers||[]).length;
-    const isVolunteer = userName && (fixture.volunteers||[]).includes(userName);
-    if(userRole === 'admin'){
-      if(fixture.status === 'assigned'){
-        return `<div class="p-2 text-center text-xs space-y-1">
+    // Render action HTML depending on role and fixture state
+    function renderActionHtmlForUser(fixture) {
+      const volunteerCount = (fixture.volunteers || []).length;
+      const isVolunteer = userName && (fixture.volunteers || []).includes(userName);
+
+      if (userRole === 'admin') {
+        if (fixture.status === 'assigned') {
+          return `<div class="p-2 text-center text-xs space-y-1">
             <p class="font-bold text-green-600 truncate">${fixture.assignedRef}</p>
             <button onclick="event.stopPropagation(); handleUnassign('${fixture.id}')" class="text-xs text-red-500 hover:text-red-700 underline">Clear</button>
           </div>`;
-      } else {
-        return `<div class="p-2 text-center text-sm">
+        } else {
+          return `<div class="p-2 text-center text-sm">
             <span class="font-bold text-red-600">${volunteerCount} <span class="hidden sm:inline">Volunteer(s)</span></span>
             <p class="text-xs text-gray-500 mt-1">Click to Assign</p>
           </div>`;
-      }
-    } else if(userRole === 'referee'){
-      if(fixture.status === 'assigned' && fixture.assignedRef === userName){
-        return `<div class="p-2 text-center text-sm text-green-600 font-bold">ASSIGNED</div>`;
-      } else if(fixture.status === 'assigned' && fixture.assignedRef !== userName){
-        return `<div class="p-2 text-center text-sm text-gray-600 font-bold">Assigned to: ${fixture.assignedRef}</div>`;
+        }
+      } else if (userRole === 'referee') {
+        if (fixture.status === 'assigned' && fixture.assignedRef === userName) {
+          return `<div class="p-2 text-center text-sm text-green-600 font-bold">ASSIGNED</div>`;
+        } else if (fixture.status === 'assigned' && fixture.assignedRef !== userName) {
+          return `<div class="p-2 text-center text-sm text-gray-600 font-bold">Assigned to: ${fixture.assignedRef}</div>`;
+        } else {
+          const actionClass = isVolunteer ? 'bg-red-500 hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700';
+          const actionText = isVolunteer ? 'Cancel Application' : 'Apply Now';
+          const actionState = isVolunteer ? 'false' : 'true';
+          return `<button onclick="handleVolunteer(event,'${fixture.id}', ${actionState})" class="w-full h-full text-white p-2 font-semibold text-sm ${actionClass} transition duration-150">${actionText}</button>`;
+        }
       } else {
-        const actionClass = isVolunteer ? 'bg-red-500 hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700';
-        const actionText = isVolunteer ? 'Cancel Application' : 'Apply Now';
-        const actionState = isVolunteer ? 'false' : 'true';
-        return `<button onclick="handleVolunteer(event,'${fixture.id}', ${actionState})" class="w-full h-full text-white p-2 font-semibold text-sm ${actionClass} transition duration-150">${actionText}</button>`;
+        return `<div class="p-2 text-center text-sm text-gray-500">${fixture.status === 'assigned' ? 'Assigned' : 'Login to Apply'}</div>`;
       }
-    } else {
-      return `<div class="p-2 text-center text-sm text-gray-500">${fixture.status==='assigned' ? 'Assigned' : 'Login to Apply'}</div>`;
-    }
-  }
-
-  // -----------------------------
-  // HELPERS: convert time formats, escape HTML
-  // -----------------------------
-  function convertTimeTo24(timeStr){
-    if(!timeStr) return '';
-    // Accept "7:00 PM" style or "19:00"
-    const pmRegex = /(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)/;
-    const m = timeStr.match(pmRegex);
-    if(m){
-      let h = parseInt(m[1],10), min = m[2], ap = m[3].toLowerCase();
-      if(ap==='pm' && h<12) h += 12;
-      if(ap==='am' && h===12) h = 0;
-      return `${String(h).padStart(2,'0')}:${min}`;
-    }
-    // assume already 24h
-    return timeStr;
-  }
-  function formatTimeFromInputs(hoursMinutes){
-    // returns "7:00 PM" style
-    if(!hoursMinutes) return '';
-    const [h,m] = hoursMinutes.split(':').map(Number);
-    if(isNaN(h)) return '';
-    const ap = h>=12 ? 'PM' : 'AM';
-    const hh = ((h+11)%12+1);
-    return `${hh}:${String(m).padStart(2,'0')} ${ap}`;
-  }
-  function escapeHtml(s){ return (s||'').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
-
-  // -----------------------------
-  // VOLUNTEER / ASSIGN / UNASSIGN
-  // -----------------------------
-  window.openAssignmentModal = function(matchId, home, away, date, time, volunteersJson, assignedRef){
-    if(userRole !== 'admin') return;
-    let volunteers=[];
-    try{ volunteers = JSON.parse(volunteersJson.replace(/\\'/g,"'")); } catch(e){ volunteers = []; }
-    const modal = document.getElementById('admin-assignment-modal-backdrop');
-    const title = document.getElementById('modal-match-title');
-    const details = document.getElementById('modal-match-details');
-    const listContainer = document.getElementById('volunteer-list-container');
-    const matchIdInput = document.getElementById('modal-match-id');
-    const assignBtn = document.getElementById('assign-button');
-    if(!modal || !title || !details || !listContainer || !matchIdInput || !assignBtn) return;
-    title.textContent = `${home} vs ${away}`;
-    details.textContent = `${date} at ${time}`;
-    matchIdInput.value = matchId;
-    listContainer.innerHTML = '';
-    if(assignedRef){ listContainer.innerHTML = `<p class="font-bold text-green-600">Currently Assigned: ${assignedRef}</p>`; assignBtn.disabled=true; assignBtn.textContent='Already Assigned'; }
-    else if(volunteers.length===0){ listContainer.innerHTML = '<p class="text-sm text-gray-600">No referees have volunteered yet.</p>'; assignBtn.disabled=true; assignBtn.textContent='No Volunteers'; }
-    else {
-      volunteers.forEach(n=>{
-        const safe = n.replace(/[^a-z0-9]/gi,'_');
-        const id = `ref-${safe}`;
-        listContainer.innerHTML += `<label for="${id}" class="flex items-center p-2 bg-white rounded-lg cursor-pointer hover:bg-red-50 transition">
-          <input type="radio" id="${id}" name="selected_ref" value="${n}" class="text-red-600 focus:ring-red-500 h-4 w-4" />
-          <span class="ml-3 font-medium text-gray-900">${n}</span>
-        </label>`;
-      });
-      assignBtn.disabled=true; assignBtn.textContent='Confirm Assignment';
-      document.querySelectorAll('input[name="selected_ref"]').forEach(r=>r.addEventListener('change',()=>assignBtn.disabled=false));
-    }
-    modal.classList.add('show'); modal.style.display='flex';
-  };
-  window.closeAssignmentModal = function(){ const modal=document.getElementById('admin-assignment-modal-backdrop'); if(!modal) return; modal.classList.remove('show'); setTimeout(()=>modal.style.display='none',300); };
-
-  window.handleFinalAssignment = async function(){
-    if(userRole!=='admin') return showStatus('danger','Only administrators can make assignments.');
-    const matchId = document.getElementById('modal-match-id')?.value;
-    const selected = document.querySelector('input[name="selected_ref"]:checked');
-    if(!matchId || !selected) return showStatus('warning','Missing information');
-    const target = selected.value;
-
-    if(isDbReady && db){
-      try{
-        const refDoc = doc(db, FIRES_COLLECTION_PATH, matchId);
-        await updateDoc(refDoc, { assignedRef: target, status:'assigned', updatedAt: serverTimestamp() });
-        closeAssignmentModal(); showStatus('success','Assigned in database.');
-        return;
-      } catch(e){ console.error('assign db',e); isDbReady=false; showStatus('danger','DB failed; falling back local'); }
     }
 
-    // local fallback
-    updateLocalFixture(matchId, { assignedRef: target, status:'assigned', updatedAt: Date.now() });
-    closeAssignmentModal(); showStatus('success','Assigned locally.');
-  };
+    // ----- Volunteer logic (works for both fixtures and night shifts) -----
+    window.handleVolunteer = async function (event, matchId, isVolunteering) {
+      if (event && event.stopPropagation) event.stopPropagation();
+      if (!userName || userRole !== 'referee') return showStatus('danger', 'Please log in as a Referee first.');
 
-  window.handleVolunteer = async function(event, matchId, isVolunteering){
-    if(event && event.stopPropagation) event.stopPropagation();
-    if(!userName || userRole!=='referee') return showStatus('danger','Please log in as a Referee first.');
+      // If DB offline: per your instruction admin actions disabled; volunteers can still be attempted locally (we'll store locally)
+      if (!isDbReady || !db) {
+        // local fallback: update local stored volunteers for display only
+        let fixtures = loadFixturesLocal();
+        const idx = fixtures.findIndex(f => f.id === matchId);
+        if (idx >= 0) {
+          const vol = fixtures[idx].volunteers || [];
+          if (isVolunteering) {
+            if (!vol.includes(userName)) vol.push(userName);
+          } else {
+            fixtures[idx].volunteers = vol.filter(n => n !== userName);
+          }
+        } else {
+          // If not in local, add a small local state for display (not persistent to DB)
+          fixtures.push({ id: matchId, volunteers: isVolunteering ? [userName] : [], assignedRef: null, status: 'open', isNightShift: NIGHT_SHIFTS.some(n => n.id === matchId) });
+        }
+        // Save a local copy for display only
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(fixtures));
+        renderAll(mergeNightShifts(fixtures));
+        return showStatus('success', isVolunteering ? 'Applied locally (DB offline).' : 'Application cancelled locally (DB offline).');
+      }
 
-    if(isDbReady && db){
-      try{
+      // DB path: update volunteers array properly
+      try {
         const refDoc = doc(db, FIRES_COLLECTION_PATH, matchId);
         const action = isVolunteering ? arrayUnion(userName) : arrayRemove(userName);
-        await updateDoc(refDoc, { volunteers: action, updatedAt: serverTimestamp(), status:'open' });
-        return showStatus('success', isVolunteering ? `✅ ${userName}, you have applied!` : 'Cancelled');
-      } catch(e){ console.error('vol db',e); isDbReady=false; showStatus('danger','DB failed; falling back local'); }
-    }
-
-    // local fallback
-    const fixtures = loadFixturesLocal();
-    const i = fixtures.findIndex(f => f.id === matchId);
-    if(i>=0){
-      const cur = fixtures[i].volunteers || [];
-      if(isVolunteering){
-        if(!cur.includes(userName)) cur.push(userName);
-      } else {
-        fixtures[i].volunteers = cur.filter(n=>n!==userName);
+        await updateDoc(refDoc, { volunteers: action, updatedAt: serverTimestamp(), status: 'open' });
+        showStatus('success', isVolunteering ? 'Application submitted.' : 'Application cancelled.');
+      } catch (e) {
+        console.error('Volunteer update failed', e);
+        isDbReady = false;
+        updateUIBasedOnIdentity();
+        showStatus('danger', 'Volunteer failed; DB error. Running offline.');
+        setupDataListener();
       }
-      saveFixturesLocal(fixtures);
-      renderAll(mergeNightShifts(fixtures));
-      return showStatus('success', isVolunteering ? 'Applied locally.' : 'Cancelled locally.');
-    } else {
-      // might be a night shift not yet in local
-      updateLocalFixture(matchId, { volunteers: isVolunteering ? [userName] : [], assignedRef:null, status:'open' });
-      return showStatus('success', isVolunteering ? 'Applied (local).' : 'Cancelled local');
-    }
-  };
+    };
 
-  window.handleUnassign = async function(matchId){
-    if(userRole!=='admin') return showStatus('danger','Only administrators can unassign.');
-    if(isDbReady && db){
-      try{ const refDoc = doc(db, FIRES_COLLECTION_PATH, matchId); await updateDoc(refDoc, { assignedRef:null, status:'open', updatedAt: serverTimestamp() }); return showStatus('warning','Assignment cleared (db)'); } catch(e){ console.error('unassign db',e); isDbReady=false; showStatus('danger','DB failed; falling back local'); }
-    }
-    updateLocalFixture(matchId, { assignedRef:null, status:'open', updatedAt: Date.now() });
-    showStatus('warning','Assignment cleared (local).');
-  };
+    // ----- Admin approve/assign (uses modal) -----
+    window.openAssignmentModal = function (matchId, home, away, date, time, volunteersJson, assignedRef) {
+      if (userRole !== 'admin') return;
+      // Parse volunteers
+      let volunteers = [];
+      try { volunteers = JSON.parse(volunteersJson || '[]'); } catch (e) { volunteers = []; }
+      // populate modal
+      const modal = document.getElementById('admin-assignment-modal-backdrop');
+      document.getElementById('modal-match-title').textContent = `${home}${away ? ' vs ' + away : ''}`;
+      document.getElementById('modal-match-details').textContent = `${date} ${time || ''}`;
+      const list = document.getElementById('volunteer-list-container');
+      list.innerHTML = '';
+      if (assignedRef) {
+        list.innerHTML = `<p class="font-bold text-green-600">Currently Assigned: ${assignedRef}</p>`;
+        document.getElementById('assign-confirm-btn').disabled = true;
+      } else if (!volunteers.length) {
+        list.innerHTML = '<p class="text-sm text-gray-600">No volunteers</p>';
+        document.getElementById('assign-confirm-btn').disabled = true;
+      } else {
+        for (const name of volunteers) {
+          const safe = name.replace(/[^a-z0-9]/gi, '_');
+          const id = `v-${safe}`;
+          const label = document.createElement('label');
+          label.className = 'flex items-center justify-between p-2 bg-white rounded-lg';
+          label.innerHTML = `<div class="flex items-center"><input type="radio" name="selected_ref" value="${name}" id="${id}" class="h-4 w-4"><span class="ml-3">${name}</span></div>`;
+          list.appendChild(label);
+        }
+        document.querySelectorAll('input[name="selected_ref"]').forEach(r => r.addEventListener('change', () => {
+          document.getElementById('assign-confirm-btn').disabled = false;
+        }));
+        document.getElementById('assign-confirm-btn').disabled = true;
+      }
+      // store matchId temporarily
+      modal.dataset.matchId = matchId;
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+    };
 
-  // -----------------------------
-  // UPDATE LOCAL FIXTURE (helper)
-  // -----------------------------
-  function updateLocalFixture(matchId, updates){
-    const fixtures = loadFixturesLocal();
-    const idx = fixtures.findIndex(f => f.id === matchId);
-    if(idx !== -1){ fixtures[idx] = { ...fixtures[idx], ...updates }; }
-    else {
-      // if it's night shift, push merged
-      const staticS = NIGHT_SHIFTS.find(s => s.id === matchId);
-      if(staticS) fixtures.push({ ...staticS, ...updates });
-      else fixtures.push({ id:matchId, ...updates });
-    }
-    saveFixturesLocal(fixtures);
-    renderAll(mergeNightShifts(fixtures));
-  }
+    window.closeAssignmentModal = function () {
+      const modal = document.getElementById('admin-assignment-modal-backdrop');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+      modal.dataset.matchId = '';
+    };
 
-  // -----------------------------
-  // INLINE EDIT CONTROLS (start/cancel/save/delete)
-  // -----------------------------
-  window.startEdit = function(matchId){ editingIds.add(matchId); if(!isDbReady||!db) renderAll(mergeNightShifts(loadFixturesLocal())); else setupDataListener(); };
-  window.cancelEdit = function(matchId){ editingIds.delete(matchId); if(!isDbReady||!db) renderAll(mergeNightShifts(loadFixturesLocal())); else setupDataListener(); };
-
-  window.saveEdit = async function(matchId){
-    const dateInput = document.getElementById(`edit-date-${matchId}`)?.value;
-    const timeInput = document.getElementById(`edit-time-${matchId}`)?.value;
-    const home = document.getElementById(`edit-home-${matchId}`)?.value || '';
-    const away = document.getElementById(`edit-away-${matchId}`)?.value || '';
-    const venue = document.getElementById(`edit-venue-${matchId}`)?.value || '';
-    const pitch = document.getElementById(`edit-pitch-${matchId}`)?.value || '';
-
-    // compute dateSortable and dateFormatted
-    let dateSortable = 0, dateFormatted = '';
-    if(dateInput){
+    window.handleFinalAssignment = async function () {
+      if (userRole !== 'admin') return showStatus('danger', 'Only admin can assign.');
+      if (!isDbReady || !db) return showStatus('danger', 'Database offline; cannot assign.');
+      const modal = document.getElementById('admin-assignment-modal-backdrop');
+      const matchId = modal.dataset.matchId;
+      const selected = document.querySelector('input[name="selected_ref"]:checked');
+      if (!matchId || !selected) return showStatus('warning', 'Select a referee first.');
+      const target = selected.value;
       try {
-        const dt = new Date(`${dateInput}T${timeInput || '00:00'}`);
-        if(!isNaN(dt.getTime())){ dateSortable = dt.getTime(); dateFormatted = dateFormatter.format(dt); }
-      } catch(e){ console.warn('date parse', e); }
-    }
-
-    const updates = {
-      home, away, venue, pitch, time: formatTimeFromInputs(timeInput),
-      dateSortable: dateSortable || undefined,
-      dateFormatted: dateFormatted || undefined,
-      updatedAt: Date.now()
+        const refDoc = doc(db, FIRES_COLLECTION_PATH, matchId);
+        await updateDoc(refDoc, { assignedRef: target, status: 'assigned', updatedAt: serverTimestamp() });
+        closeAssignmentModal();
+        showStatus('success', `${target} assigned.`);
+      } catch (e) {
+        console.error('assign failed', e);
+        showStatus('danger', 'Assign failed.');
+      }
     };
 
-    if(isDbReady && db){
-      try{
+    // ----- Admin unassign -----
+    window.handleUnassign = async function (matchId) {
+      if (userRole !== 'admin') return showStatus('danger', 'Only admin can unassign.');
+      if (!isDbReady || !db) return showStatus('danger', 'Database offline; cannot unassign.');
+      try {
         const refDoc = doc(db, FIRES_COLLECTION_PATH, matchId);
-        // avoid setting undefined values in Firestore
-        const cleaned = {};
-        Object.keys(updates).forEach(k => { if(updates[k]!==undefined) cleaned[k]=updates[k]; });
-        await updateDoc(refDoc, cleaned);
-        editingIds.delete(matchId); showStatus('success','Fixture updated (db)'); return;
-      } catch(e){ console.error('save edit db',e); isDbReady=false; showStatus('danger','DB failed; falling back local'); }
-    }
-
-    // local fallback
-    const fixtures = loadFixturesLocal();
-    const idx = fixtures.findIndex(f => f.id === matchId);
-    if(idx>=0){
-      fixtures[idx] = { ...fixtures[idx], ...updates };
-    } else {
-      fixtures.push({ id:matchId, ...updates, volunteers:[], assignedRef:null, status:'open' });
-    }
-    saveFixturesLocal(fixtures);
-    editingIds.delete(matchId);
-    renderAll(mergeNightShifts(fixtures));
-    showStatus('success','Fixture updated locally.');
-  };
-
-  window.permanentlyDeleteFixture = async function(matchId){
-    if(userRole!=='admin') return showStatus('danger','Only administrators can delete fixtures.');
-    const isNight = NIGHT_SHIFTS.some(s=>s.id===matchId);
-    if(isNight){
-      // for night shifts, delete acts as hide for the week
-      return hideNightShift(matchId);
-    }
-    if(isDbReady && db){
-      try{
-        const refDoc = doc(db, FIRES_COLLECTION_PATH, matchId);
-        await deleteDoc(refDoc);
-        showStatus('warning','Fixture permanently deleted (db).'); return;
-      } catch(e){ console.error('delete db',e); isDbReady=false; showStatus('danger','DB delete failed; falling back local'); }
-    }
-    // local removal
-    const fixtures = loadFixturesLocal().filter(f=>f.id!==matchId);
-    saveFixturesLocal(fixtures);
-    renderAll(mergeNightShifts(fixtures));
-    showStatus('warning','Fixture permanently removed (local).');
-  };
-
-  // -----------------------------
-  // ADD FIXTURE INLINE (save & clear)
-  // -----------------------------
-  window.toggleAddFixtureForm = function(show){
-    const form = document.getElementById('add-fixture-form');
-    if(!form) return;
-    form.classList.toggle('hidden', !show);
-  };
-
-  window.handleAddFixture = async function(){
-    if(userRole!=='admin') return showStatus('danger','Only administrators can add fixtures.');
-    const dateVal = document.getElementById('new-fixture-date')?.value;
-    const timeVal = document.getElementById('new-fixture-time')?.value;
-    const venue = document.getElementById('new-fixture-venue')?.value?.trim();
-    const home = document.getElementById('new-fixture-home')?.value?.trim();
-    const away = document.getElementById('new-fixture-away')?.value?.trim();
-    const pitch = document.getElementById('new-fixture-pitch')?.value?.trim();
-    if(!dateVal || !timeVal || !home || !away || !venue) return showStatus('danger','Fill date/time/home/away/venue');
-
-    const dt = new Date(`${dateVal}T${timeVal}`);
-    const newFixture = {
-      id: crypto.randomUUID(),
-      home, away, venue, pitch, time: formatTimeFromInputs(timeVal),
-      dateSortable: isNaN(dt.getTime()) ? Date.now() : dt.getTime(),
-      dateFormatted: isNaN(dt.getTime()) ? dateVal : dateFormatter.format(dt),
-      assignedRef:null, volunteers:[], status:'open', isNightShift:false, createdAt: Date.now(), updatedAt: Date.now()
+        await updateDoc(refDoc, { assignedRef: null, status: 'open', updatedAt: serverTimestamp() });
+        showStatus('warning', 'Assignment cleared.');
+      } catch (e) {
+        console.error('unassign failed', e); showStatus('danger', 'Unassign failed.');
+      }
     };
 
-    if(isDbReady && db){
-      try{
-        const col = collection(db, FIRES_COLLECTION_PATH);
-        const docRef = await addDoc(col, { ...newFixture, id: undefined, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-        // set the doc to include its firestore id
+    // ----- Inline edit controls (admin only when DB ready) -----
+    window.startEdit = function (matchId) {
+      if (!isDbReady) return showStatus('danger', 'Database offline; editing disabled.');
+      editingIds.add(matchId);
+      setupDataListener();
+    };
+    window.cancelEdit = function (matchId) {
+      editingIds.delete(matchId);
+      setupDataListener();
+    };
+
+    window.saveEdit = async function (matchId) {
+      if (userRole !== 'admin') return showStatus('danger', 'Only admin can save.');
+      if (!isDbReady || !db) return showStatus('danger', 'Database offline; cannot save edits.');
+
+      const dateVal = document.getElementById(`edit-date-${matchId}`)?.value;
+      const timeVal = document.getElementById(`edit-time-${matchId}`)?.value;
+      const home = document.getElementById(`edit-home-${matchId}`)?.value || '';
+      const away = document.getElementById(`edit-away-${matchId}`)?.value || '';
+      const venue = document.getElementById(`edit-venue-${matchId}`)?.value || '';
+      const pitch = document.getElementById(`edit-pitch-${matchId}`)?.value || '';
+
+      let dateSortable = undefined, dateFormatted = undefined;
+      try {
+        if (dateVal) {
+          const dt = new Date(`${dateVal}T${timeVal || '00:00'}`);
+          if (!isNaN(dt.getTime())) { dateSortable = dt.getTime(); dateFormatted = dateFormatter.format(dt); }
+        }
+      } catch (e) { console.warn('date parse failed', e); }
+
+      const updateObj = {
+        home, away, venue, pitch, time: formatTimeFromInputs(timeVal), updatedAt: serverTimestamp()
+      };
+      if (dateSortable) updateObj.dateSortable = dateSortable;
+      if (dateFormatted) updateObj.dateFormatted = dateFormatted;
+
+      try {
+        const refDoc = doc(db, FIRES_COLLECTION_PATH, matchId);
+        await updateDoc(refDoc, updateObj);
+        editingIds.delete(matchId);
+        showStatus('success', 'Fixture updated.');
+      } catch (e) {
+        console.error('saveEdit failed', e);
+        showStatus('danger', 'Save failed.');
+      }
+    };
+
+    // ----- Delete fixture (permanent) -----
+    window.permanentlyDeleteFixture = async function (matchId) {
+      if (userRole !== 'admin') return showStatus('danger', 'Only admin can delete.');
+      const isNight = NIGHT_SHIFTS.some(n => n.id === matchId);
+      if (isNight) {
+        // For night shifts, delete acts as Hide (per your instruction)
+        return hideNightShift(matchId);
+      }
+      if (!isDbReady || !db) return showStatus('danger', 'Database offline; cannot delete.');
+      try {
+        await deleteDoc(doc(db, FIRES_COLLECTION_PATH, matchId));
+        showStatus('warning', 'Fixture permanently deleted.');
+      } catch (e) {
+        console.error('delete failed', e);
+        showStatus('danger', 'Delete failed.');
+      }
+    };
+
+    // ----- Add fixture inline (admin) -----
+    window.toggleAddFixtureForm = function (show) {
+      const form = document.getElementById('add-fixture-form');
+      if (!form) return;
+      form.classList.toggle('hidden', !show);
+    };
+
+    window.handleAddFixture = async function () {
+      if (userRole !== 'admin') return showStatus('danger', 'Only admin can add fixtures.');
+      if (!isDbReady || !db) return showStatus('danger', 'Database offline; cannot add fixtures.');
+
+      const dateVal = document.getElementById('new-fixture-date')?.value;
+      const timeVal = document.getElementById('new-fixture-time')?.value;
+      const venue = document.getElementById('new-fixture-venue')?.value?.trim();
+      const home = document.getElementById('new-fixture-home')?.value?.trim();
+      const away = document.getElementById('new-fixture-away')?.value?.trim();
+      const pitch = document.getElementById('new-fixture-pitch')?.value?.trim();
+
+      if (!dateVal || !timeVal || !home || !away || !venue) return showStatus('danger', 'Please fill date, time, home, away and venue.');
+
+      try {
+        const dt = new Date(`${dateVal}T${timeVal}`);
+        const newFixture = {
+          home, away, venue, pitch, time: formatTimeFromInputs(timeVal),
+          dateSortable: isNaN(dt.getTime()) ? Date.now() : dt.getTime(),
+          dateFormatted: isNaN(dt.getTime()) ? dateVal : dateFormatter.format(dt),
+          assignedRef: null, volunteers: [], status: 'open', isNightShift: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        };
+        const colRef = collection(db, FIRES_COLLECTION_PATH);
+        const docRef = await addDoc(colRef, { ...newFixture });
+        // ensure id saved
         await updateDoc(doc(db, FIRES_COLLECTION_PATH, docRef.id), { id: docRef.id });
-        showStatus('success','Fixture added to database.');
+        showStatus('success', 'Fixture added.');
         toggleAddFixtureForm(false);
-        // clear fields
-        ['new-fixture-date','new-fixture-time','new-fixture-venue','new-fixture-home','new-fixture-away','new-fixture-pitch'].forEach(id=>document.getElementById(id).value='');
-        return;
-      } catch(e){ console.error('add db',e); isDbReady=false; showStatus('danger','DB failed; falling back local'); }
-    }
+        ['new-fixture-date', 'new-fixture-time', 'new-fixture-venue', 'new-fixture-home', 'new-fixture-away', 'new-fixture-pitch'].forEach(id => document.getElementById(id).value = '');
+      } catch (e) {
+        console.error('add fixture failed', e);
+        showStatus('danger', 'Add fixture failed.');
+      }
+    };
 
-    const existing = loadFixturesLocal(); existing.push(newFixture); saveFixturesLocal(existing);
-    toggleAddFixtureForm(false);
-    ['new-fixture-date','new-fixture-time','new-fixture-venue','new-fixture-home','new-fixture-away','new-fixture-pitch'].forEach(id=>document.getElementById(id).value='');
-    renderAll(mergeNightShifts(existing));
-    showStatus('success','Fixture added locally.');
-  };
-
-  // -----------------------------
-  // NIGHT SHIFT HIDE & RESTORE
-  // -----------------------------
-  window.hideNightShift = async function(shiftId){
-    if(userRole!=='admin') return showStatus('danger','Only admin can hide night shifts.');
-    // DB path
-    if(isDbReady && db){
-      try{
+    // ----- Hide & restore night shifts (per shift) -----
+    window.hideNightShift = async function (shiftId) {
+      if (userRole !== 'admin') return showStatus('danger', 'Only admin can hide night shifts.');
+      if (!isDbReady || !db) return showStatus('danger', 'Database offline; cannot hide.');
+      try {
         const refDoc = doc(db, FIRES_COLLECTION_PATH, shiftId);
-        await updateDoc(refDoc, { hiddenThisWeek:true, updatedAt: serverTimestamp() });
-        showStatus('warning','Night shift hidden (db).');
-        return;
-      } catch(e){ console.error('hide db',e); isDbReady=false; showStatus('danger','DB failed; falling back local'); }
-    }
-    // local fallback: mark hidden
-    updateLocalFixture(shiftId, { hiddenThisWeek:true, updatedAt: Date.now() });
-    // visual: immediate fade and remove for non-admins (we re-render)
-    const el = document.querySelector(`[data-id="${shiftId}"]`);
-    if(el){ el.classList.add('faded'); setTimeout(()=>{ renderAll(mergeNightShifts(loadFixturesLocal())); },350); }
-    showStatus('warning','Night shift hidden for this week (local).');
-  };
+        await updateDoc(refDoc, { hiddenThisWeek: true, updatedAt: serverTimestamp() });
+        showStatus('warning', 'Night shift hidden for this week.');
+      } catch (e) {
+        console.error('hide failed', e); showStatus('danger', 'Hide failed.');
+      }
+    };
 
-  window.restoreHiddenNightShifts = async function(){
-    if(userRole!=='admin') return showStatus('danger','Only admin can restore.');
-    // DB path
-    if(isDbReady && db){
-      try{
-        // naive approach: load local/remote, remove hiddenThisWeek on known night shift docs
-        const allLocal = loadFixturesLocal();
-        const updated = allLocal.map(f=> ({ ...f, hiddenThisWeek: false }));
-        saveFixturesLocal(updated);
-        // Note: to restore DB entries we'd need to fetch each night shift doc and update; for simplicity, we remove the hidden flag from local store and attempt to update DB for any matching docs
-        const col = collection(db, FIRES_COLLECTION_PATH);
-        const snapshot = await getDocs(query(col));
-        snapshot.forEach(async d => {
-          if(NIGHT_SHIFTS.some(n=>n.id===d.id || n.id===d.data().id)) {
-            try{ await updateDoc(doc(db, FIRES_COLLECTION_PATH, d.id), { hiddenThisWeek:false, updatedAt: serverTimestamp() }); } catch(e){}
-          }
-        });
-        showStatus('success','Hidden night shifts restored (db+local).');
-        renderAll(mergeNightShifts(updated));
-        return;
-      } catch(e){ console.error('restore db',e); isDbReady=false; showStatus('danger','DB restore failed; falling back local'); }
-    }
-    // local only
-    const fixtures = loadFixturesLocal().map(f => ({ ...f, hiddenThisWeek:false }));
-    saveFixturesLocal(fixtures);
-    renderAll(mergeNightShifts(fixtures));
-    showStatus('success','Hidden night shifts restored (local).');
-  };
+    window.restoreNightShift = async function (shiftId) {
+      if (userRole !== 'admin') return showStatus('danger', 'Only admin can restore night shifts.');
+      if (!isDbReady || !db) return showStatus('danger', 'Database offline; cannot restore.');
+      try {
+        const refDoc = doc(db, FIRES_COLLECTION_PATH, shiftId);
+        await updateDoc(refDoc, { hiddenThisWeek: false, updatedAt: serverTimestamp() });
+        showStatus('success', 'Night shift restored.');
+      } catch (e) {
+        console.error('restore failed', e); showStatus('danger', 'Restore failed.');
+      }
+    };
 
-  // -----------------------------
-  // STARTUP
-  // -----------------------------
-  function startApp(){ updateUIBasedOnIdentity(); initFirebase(); }
-  startApp();
+    // ----- Helpers -----
+    function escapeHtml(s) { return (s || '').replaceAll('"', '&quot;').replaceAll("'", '&#39;'); }
+    function convertTimeTo24(timeStr) {
+      if (!timeStr) return '';
+      const pmRegex = /(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)/;
+      const m = timeStr.match(pmRegex);
+      if (m) {
+        let h = parseInt(m[1], 10), min = m[2], ap = m[3].toLowerCase();
+        if (ap === 'pm' && h < 12) h += 12;
+        if (ap === 'am' && h === 12) h = 0;
+        return `${String(h).padStart(2, '0')}:${min}`;
+      }
+      return timeStr;
+    }
+    function formatTimeFromInputs(hoursMinutes) {
+      if (!hoursMinutes) return '';
+      const [h, m] = hoursMinutes.split(':').map(Number);
+      if (isNaN(h)) return '';
+      const ap = h >= 12 ? 'PM' : 'AM';
+      const hh = ((h + 11) % 12 + 1);
+      return `${hh}:${String(m).padStart(2, '0')} ${ap}`;
+    }
+
+    // ----- Update local fixture doc helper (read-only local fallback usage) -----
+    function updateLocalFixtureForDisplay(matchId, updates) {
+      // used only for volunteer updates or offline display; not used for admin edits when DB offline (per your instruction)
+      const ls = loadFixturesLocal();
+      const idx = ls.findIndex(f => f.id === matchId);
+      if (idx >= 0) ls[idx] = { ...ls[idx], ...updates };
+      else {
+        // create a minimal local record
+        ls.push({ id: matchId, ...updates });
+      }
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(ls));
+      renderAll(mergeNightShifts(ls));
+    }
+
+    // ----- Start app -----
+    function startApp() {
+      updateUIBasedOnIdentity();
+      initFirebase();
+    }
+    startApp();
 
   </script>
 </body>
